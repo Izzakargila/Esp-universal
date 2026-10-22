@@ -1,7 +1,7 @@
 --[[ 
-    Fallen Survival | Advanced ESP GUI
+    Fallen Survival | Advanced ESP GUI (Minimize Update)
     Executor: Delta
-    Fitur: Tracer, Box, Chams, Name ESP, Distance, Color Picker
+    Fitur: Tracer, Box, Chams, Name ESP, Distance, Color Picker, Floating Toggle
 ]]
 
 local Players = game:GetService("Players")
@@ -20,11 +20,11 @@ local Config = {
     Name = true,
     Distance = true,
     MaxDist = 1000,
-    Color = Color3.fromRGB(255, 50, 50), -- Warna default
-    TracerOrigin = "Bottom" -- "Bottom" / "Mouse"
+    Color = Color3.fromRGB(255, 50, 50),
+    TracerOrigin = "Bottom" 
 }
 
--- Hapus GUI lama
+-- Hapus GUI lama kalau ada (biar ga double)
 local oldGui = game.CoreGui:FindFirstChild("FallenESP_GUI")
 if oldGui then oldGui:Destroy() end
 
@@ -34,20 +34,45 @@ ScreenGui.Name = "FallenESP_GUI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = game.CoreGui
 
--- Variabel Drawing & Data
-local espObjects = {} -- {[player] = {tracer, box, billboard, highlight}}
+local espObjects = {}
+
+-- ======================
+-- FUNGSI DRAG (Buat geser GUI & Tombol)
+-- ======================
+local function MakeDraggable(frame)
+    local dragging, dragInput, dragStart, startPos
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
 
 -- ======================
 -- FUNGSI UTAMA ESP
 -- ======================
-
 local function createESP(player)
     if player == LocalPlayer then return end
     
     local function setup(character)
         if not character or not character:FindFirstChild("HumanoidRootPart") or not character:FindFirstChild("Head") then return end
         
-        -- Hapus lama
         if espObjects[player] then
             for _, obj in pairs(espObjects[player]) do
                 if typeof(obj) == "Instance" then obj:Destroy() 
@@ -57,7 +82,6 @@ local function createESP(player)
         
         local data = {}
         
-        -- CHAMS (Highlight)
         local highlight = Instance.new("Highlight")
         highlight.Name = "FallenESP_Chams"
         highlight.Adornee = character
@@ -70,7 +94,6 @@ local function createESP(player)
         highlight.Parent = character
         data.highlight = highlight
         
-        -- BILLBOARD (Name & Distance)
         local billboard = Instance.new("BillboardGui")
         billboard.Name = "FallenESP_Billboard"
         billboard.Adornee = character.Head
@@ -88,11 +111,9 @@ local function createESP(player)
         textLabel.TextColor3 = Config.Color
         textLabel.TextStrokeTransparency = 0
         textLabel.TextSize = 14
-        textLabel.Text = player.Name
         data.billboard = billboard
         data.textLabel = textLabel
         
-        -- BOX & TRACER (Pakai Drawing Library)
         if Drawing then
             local box = Drawing.new("Square")
             box.Visible = false
@@ -119,9 +140,8 @@ for _, p in pairs(Players:GetPlayers()) do createESP(p) end
 Players.PlayerAdded:Connect(createESP)
 
 -- ======================
--- UPDATE LOOP
+-- UPDATE LOOP ESP
 -- ======================
-
 RunService.RenderStepped:Connect(function()
     for player, data in pairs(espObjects) do
         local char = player.Character
@@ -131,7 +151,6 @@ RunService.RenderStepped:Connect(function()
         if hrp and head and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
             local distance = (LocalPlayer.Character.HumanoidRootPart.Position - hrp.Position).Magnitude
             
-            -- Update Chams & Billboard
             if data.highlight then 
                 data.highlight.Enabled = Config.Chams and Config.ESP and distance <= Config.MaxDist
             end
@@ -148,27 +167,22 @@ RunService.RenderStepped:Connect(function()
                 end
             end
             
-            -- Update Box & Tracer (Drawing)
             if data.box and data.tracer and Drawing then
                 if Config.ESP and distance <= Config.MaxDist and (Config.Box or Config.Tracer) then
                     local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
                     
                     if onScreen then
-                        -- Hitung ukuran box berdasarkan jarak
                         local headScreen = Camera:WorldToViewportPoint(head.Position)
                         local height = math.abs(headScreen.Y - screenPos.Y) * 2
                         local width = height / 2
-                        
                         local x = screenPos.X - width / 2
                         local y = screenPos.Y - height / 2
                         
-                        -- Update Box
                         data.box.Visible = Config.Box
                         data.box.Size = Vector2.new(width, height)
                         data.box.Position = Vector2.new(x, y)
                         data.box.Color = Config.Color
                         
-                        -- Update Tracer
                         data.tracer.Visible = Config.Tracer
                         data.tracer.Color = Config.Color
                         
@@ -191,7 +205,6 @@ RunService.RenderStepped:Connect(function()
                 end
             end
         else
-            -- Matikan jika mati / jauh
             if data.highlight then data.highlight.Enabled = false end
             if data.billboard then data.billboard.Enabled = false end
             if data.box then data.box.Visible = false end
@@ -201,34 +214,8 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ======================
--- GUI BUILDER (MODERN)
+-- GUI BUILDER
 -- ======================
-
-local function MakeDraggable(frame)
-    local dragging, dragInput, dragStart, startPos
-    frame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPos = frame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
-            end)
-        end
-    end)
-    frame.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - dragStart
-            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end)
-end
-
 local function CreateToggle(parent, text, default, callback)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, -10, 0, 30)
@@ -280,14 +267,9 @@ local function CreateColorPicker(parent, text, callback)
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
     
     btn.MouseButton1Click:Connect(function()
-        -- Siklus warna (RGB)
         local colors = {
-            Color3.fromRGB(255, 50, 50),   -- Merah
-            Color3.fromRGB(50, 255, 50),   -- Hijau
-            Color3.fromRGB(50, 50, 255),   -- Biru
-            Color3.fromRGB(255, 255, 50),  -- Kuning
-            Color3.fromRGB(255, 50, 255),  -- Ungu
-            Color3.fromRGB(255, 255, 255)  -- Putih
+            Color3.fromRGB(255, 50, 50), Color3.fromRGB(50, 255, 50), Color3.fromRGB(50, 50, 255),
+            Color3.fromRGB(255, 255, 50), Color3.fromRGB(255, 50, 255), Color3.fromRGB(255, 255, 255)
         }
         local current = Config.Color
         local nextColor = colors[1]
@@ -303,7 +285,31 @@ local function CreateColorPicker(parent, text, callback)
     end)
 end
 
--- Main Frame
+-- ======================
+-- FLOATING TOGGLE BUTTON (Tombol buat buka GUI lagi)
+-- ======================
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Name = "ToggleBtn"
+ToggleBtn.Size = UDim2.new(0, 45, 0, 45)
+ToggleBtn.Position = UDim2.new(0.1, 0, 0.2, 0)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+ToggleBtn.Text = "ESP"
+ToggleBtn.TextColor3 = Color3.fromRGB(0, 255, 100)
+ToggleBtn.Font = Enum.Font.GothamBlack
+ToggleBtn.TextSize = 14
+ToggleBtn.Parent = ScreenGui
+ToggleBtn.Visible = false -- Awalnya sembunyi
+Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 8)
+
+local toggleStroke = Instance.new("UIStroke", ToggleBtn)
+toggleStroke.Color = Color3.fromRGB(0, 255, 100)
+toggleStroke.Thickness = 2
+
+MakeDraggable(ToggleBtn) -- Biar tombolnya bisa digeser
+
+-- ======================
+-- MAIN GUI FRAME
+-- ======================
 local Main = Instance.new("Frame")
 Main.Name = "Main"
 Main.Size = UDim2.new(0, 220, 0, 380)
@@ -314,12 +320,10 @@ Main.Parent = ScreenGui
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 8)
 MakeDraggable(Main)
 
--- Stroke
 local stroke = Instance.new("UIStroke", Main)
 stroke.Color = Color3.fromRGB(60, 60, 70)
 stroke.Thickness = 1
 
--- Title Bar
 local Title = Instance.new("Frame")
 Title.Size = UDim2.new(1, 0, 0, 35)
 Title.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
@@ -338,6 +342,7 @@ TitleText.TextSize = 15
 TitleText.TextXAlignment = Enum.TextXAlignment.Left
 TitleText.Parent = Title
 
+-- Tombol X (Minimize)
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0, 25, 0, 25)
 CloseBtn.Position = UDim2.new(1, -32, 0.5, -12.5)
@@ -349,16 +354,19 @@ CloseBtn.TextSize = 12
 CloseBtn.Parent = Title
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 4)
 
+-- Logic Minimize
 CloseBtn.MouseButton1Click:Connect(function()
-    ScreenGui:Destroy()
-    -- Matikan drawing
-    for _, data in pairs(espObjects) do
-        if data.box then data.box:Remove() end
-        if data.tracer then data.tracer:Remove() end
-    end
+    Main.Visible = false
+    ToggleBtn.Visible = true -- Munculin tombol melayang
 end)
 
--- Scroll Frame
+-- Logic Buka lagi dari tombol melayang
+ToggleBtn.MouseButton1Click:Connect(function()
+    Main.Visible = true
+    ToggleBtn.Visible = false -- Sembunyiin tombol melayang
+end)
+
+-- Scroll Frame (Isi Menu)
 local Scroll = Instance.new("ScrollingFrame")
 Scroll.Size = UDim2.new(1, -20, 1, -45)
 Scroll.Position = UDim2.new(0, 10, 0, 40)
@@ -369,13 +377,11 @@ Scroll.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 90)
 Scroll.CanvasSize = UDim2.new(0, 0, 0, 350)
 Scroll.Parent = Main
 
--- Layout
 local Layout = Instance.new("UIListLayout")
 Layout.Padding = UDim.new(0, 6)
 Layout.SortOrder = Enum.SortOrder.LayoutOrder
 Layout.Parent = Scroll
 
--- Section 1: Visuals
 local Section1 = Instance.new("TextLabel")
 Section1.Size = UDim2.new(1, 0, 0, 20)
 Section1.BackgroundTransparency = 1
@@ -392,7 +398,6 @@ CreateToggle(Scroll, "Tracer ESP", Config.Tracer, function(v) Config.Tracer = v 
 CreateToggle(Scroll, "Chams (Highlight)", Config.Chams, function(v) Config.Chams = v end)
 CreateToggle(Scroll, "Name & Distance", Config.Name, function(v) Config.Name = v; Config.Distance = v end)
 
--- Section 2: Settings
 local Section2 = Instance.new("TextLabel")
 Section2.Size = UDim2.new(1, 0, 0, 20)
 Section2.BackgroundTransparency = 1
@@ -405,7 +410,6 @@ Section2.Parent = Scroll
 
 CreateColorPicker(Scroll, "ESP Color", function(c) Config.Color = c end)
 
--- Max Distance Slider (Manual)
 local distFrame = Instance.new("Frame")
 distFrame.Size = UDim2.new(1, -10, 0, 50)
 distFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
@@ -445,7 +449,6 @@ distBox.FocusLost:Connect(function()
     end
 end)
 
--- Watermark
 local Watermark = Instance.new("TextLabel")
 Watermark.Size = UDim2.new(1, -20, 0, 20)
 Watermark.Position = UDim2.new(0, 10, 1, -25)
@@ -455,11 +458,3 @@ Watermark.TextColor3 = Color3.fromRGB(80, 80, 90)
 Watermark.Font = Enum.Font.Gotham
 Watermark.TextSize = 10
 Watermark.Parent = Main
-
--- Toggle GUI dengan tombol (opsional, buat nyembunyiin)
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.RightShift then
-        Main.Visible = not Main.Visible
-    end
-end)
