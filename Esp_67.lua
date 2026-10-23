@@ -1,4 +1,4 @@
---[[ Brisk Survival Script — Raycast Silent Aim Part 1/4 ]]
+--[[ Brisk Survival Script — Anti-Crash Silent Aim (Part 1/3) ]]
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -9,16 +9,11 @@ local Camera = workspace.CurrentCamera
 local Drawing = Drawing or nil
 
 local Theme = {
-    Background = Color3.fromRGB(12, 12, 16),
-    SideBar = Color3.fromRGB(18, 18, 24),
-    Element = Color3.fromRGB(28, 28, 36),
-    ElementHover = Color3.fromRGB(42, 42, 54),
-    Accent = Color3.fromRGB(0, 180, 255),
-    AccentGreen = Color3.fromRGB(0, 220, 120),
-    AccentRed = Color3.fromRGB(255, 60, 60),
-    AccentOff = Color3.fromRGB(55, 55, 68),
-    Text = Color3.fromRGB(240, 240, 245),
-    TextDim = Color3.fromRGB(130, 130, 145),
+    Background = Color3.fromRGB(12, 12, 16), SideBar = Color3.fromRGB(18, 18, 24),
+    Element = Color3.fromRGB(28, 28, 36), ElementHover = Color3.fromRGB(42, 42, 54),
+    Accent = Color3.fromRGB(0, 180, 255), AccentGreen = Color3.fromRGB(0, 220, 120),
+    AccentRed = Color3.fromRGB(255, 60, 60), AccentOff = Color3.fromRGB(55, 55, 68),
+    Text = Color3.fromRGB(240, 240, 245), TextDim = Color3.fromRGB(130, 130, 145)
 }
 
 local Config = {
@@ -26,7 +21,7 @@ local Config = {
     Color = Color3.fromRGB(255, 50, 50),
     ItemESP = true, Fullbright = true, NoFog = true, NoWeather = true,
     SilentAim = false, ShowFOV = true, FOV = 150,
-    Aimbot = false, WallCheck = true,
+    Aimbot = false,
 }
 
 local oldGui = game.CoreGui:FindFirstChild("BriskSurvivalScript")
@@ -39,11 +34,8 @@ ScreenGui.Parent = game.CoreGui
 local fovCircle
 if Drawing then
     fovCircle = Drawing.new("Circle")
-    fovCircle.Thickness = 1.5
-    fovCircle.Color = Theme.Accent
-    fovCircle.Filled = false
-    fovCircle.Transparency = 0.75
-    fovCircle.Visible = false
+    fovCircle.Thickness = 1.5; fovCircle.Color = Theme.Accent
+    fovCircle.Filled = false; fovCircle.Transparency = 0.75; fovCircle.Visible = false
 end
 
 local function MakeDraggable(frame)
@@ -51,9 +43,7 @@ local function MakeDraggable(frame)
     frame.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true; dragStart = input.Position; startPos = frame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
-            end)
+            input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
         end
     end)
     frame.InputChanged:Connect(function(input)
@@ -67,17 +57,7 @@ local function MakeDraggable(frame)
     end)
 end
 
-local function hasLineOfSight(targetPart)
-    if not Config.WallCheck then return true end
-    local origin = Camera.CFrame.Position
-    local direction = (targetPart.Position - origin)
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, targetPart.Parent}
-    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-    local result = workspace:Raycast(origin, direction, raycastParams)
-    return result == nil
-end
-
+-- TARGET FINDER (Ringan & Tanpa Loop Berat)
 local function getClosestTarget(fovRadius)
     local closest, shortestDist = nil, math.huge
     local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
@@ -86,13 +66,11 @@ local function getClosestTarget(fovRadius)
             local part = player.Character:FindFirstChild("Head") or player.Character:FindFirstChild("HumanoidRootPart")
             local hum = player.Character:FindFirstChildOfClass("Humanoid")
             if part and hum and hum.Health > 0 then
-                if hasLineOfSight(part) then
-                    local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
-                    if onScreen then
-                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
-                        if dist <= fovRadius and dist < shortestDist then
-                            shortestDist = dist; closest = player
-                        end
+                local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                if onScreen then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
+                    if dist <= fovRadius and dist < shortestDist then
+                        shortestDist = dist; closest = player
                     end
                 end
             end
@@ -100,89 +78,77 @@ local function getClosestTarget(fovRadius)
     end
     return closest
 end
---[[ Part 2/4: Raycast Hook & Environment ]]
-local function applyEnvironment()
-    if Config.Fullbright then
-        Lighting.Ambient = Color3.fromRGB(255,255,255); Lighting.OutdoorAmbient = Color3.fromRGB(255,255,255)
-        Lighting.Brightness = 2; Lighting.GlobalShadows = false
-    else
-        Lighting.Ambient = Color3.fromRGB(0,0,0); Lighting.OutdoorAmbient = Color3.fromRGB(70,70,70)
-        Lighting.Brightness = 1; Lighting.GlobalShadows = true
-    end
-    if Config.NoFog then Lighting.FogEnd = 1e6; Lighting.FogStart = 0 else Lighting.FogEnd = 1000; Lighting.FogStart = 0 end
-    if Config.NoWeather then
-        local atm = Lighting:FindFirstChildOfClass("Atmosphere"); local cld = Lighting:FindFirstChildOfClass("Clouds")
-        if atm then atm:Destroy() end; if cld then cld:Destroy() end
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("ParticleEmitter") then
-                local n = obj.Name:lower()
-                if n:find("rain") or n:find("snow") or n:find("weather") or n:find("storm") then obj.Enabled = false end
-            end
+--[[ Part 2/3: Safe Silent Aim & Environment ]]
+local cachedTarget = nil
+local cachedPart = nil
+
+-- Update target setiap frame (diluar hook biar ga crash)
+RunService.Heartbeat:Connect(function()
+    if Config.SilentAim then
+        cachedTarget = getClosestTarget(Config.FOV)
+        if cachedTarget and cachedTarget.Character then
+            cachedPart = cachedTarget.Character:FindFirstChild("Head") or cachedTarget.Character:FindFirstChild("HumanoidRootPart")
+        else
+            cachedPart = nil
         end
     end
-end
-task.spawn(function() while task.wait(1) do pcall(applyEnvironment) end end)
+end)
 
--- SILENT AIM (RAYCAST + REMOTE HOOK)
+-- SILENT AIM HOOK (Hanya nge-hook Remote)
 local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
-    local args = {...}
-    
-    if not checkcaller() and Config.SilentAim then
-        local target = getClosestTarget(Config.FOV)
-        if target and target.Character then
-            local targetPart = target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
-            
-            -- 1. HOOK RAYCAST (Bypass Client-Side Raycast)
-            if method == "Raycast" and self == workspace then
-                if targetPart then
-                    local origin = args[1]
-                    local direction = args[2]
-                    -- Belokkan arah raycast ke target
-                    args[2] = (targetPart.Position - origin).Unit * direction.Magnitude
-                    return oldNamecall(self, unpack(args))
+    if not checkcaller() and Config.SilentAim and cachedPart then
+        if method == "FireServer" or method == "InvokeServer" then
+            local args = {...}
+            local modified = false
+            -- Ubah semua argumen yang berhubungan dengan posisi/part
+            for i, v in ipairs(args) do
+                if typeof(v) == "Vector3" then
+                    args[i] = cachedPart.Position
+                    modified = true
+                elseif typeof(v) == "CFrame" then
+                    args[i] = CFrame.lookAt(v.Position, cachedPart.Position)
+                    modified = true
+                elseif typeof(v) == "Instance" and v:IsA("BasePart") then
+                    args[i] = cachedPart
+                    modified = true
                 end
             end
-            
-            -- 2. HOOK FIRESERVER (Bypass Remote Event)
-            if method == "FireServer" or method == "InvokeServer" then
-                local remoteName = self.Name:lower()
-                if remoteName:find("fire") or remoteName:find("shoot") or remoteName:find("hit") or remoteName:find("attack") or remoteName:find("weapon") or remoteName:find("damage") then
-                    if targetPart then
-                        for i, v in ipairs(args) do
-                            if typeof(v) == "Vector3" then
-                                args[i] = targetPart.Position
-                            elseif typeof(v) == "CFrame" then
-                                args[i] = CFrame.lookAt(v.Position, targetPart.Position)
-                            elseif typeof(v) == "Instance" and v:IsA("BasePart") then
-                                args[i] = targetPart
-                            end
-                        end
-                        return oldNamecall(self, unpack(args))
-                    end
-                end
+            if modified then
+                return oldNamecall(self, table.unpack(args))
             end
         end
     end
     return oldNamecall(self, ...)
 end)
---[[ Part 3/4: ESP & Render Loop ]]
+
+local function applyEnvironment()
+    if Config.Fullbright then
+        Lighting.Ambient = Color3.fromRGB(255,255,255); Lighting.OutdoorAmbient = Color3.fromRGB(255,255,255)
+        Lighting.Brightness = 2; Lighting.GlobalShadows = false
+    end
+    if Config.NoFog then Lighting.FogEnd = 1e6; Lighting.FogStart = 0 end
+    if Config.NoWeather then
+        local atm = Lighting:FindFirstChildOfClass("Atmosphere"); local cld = Lighting:FindFirstChildOfClass("Clouds")
+        if atm then atm:Destroy() end; if cld then cld:Destroy() end
+    end
+end
+task.spawn(function() while task.wait(2) do pcall(applyEnvironment) end end)
+
+-- ESP SYSTEM
 local espObjects = {}
 local itemEspObjects = {}
-
-local function destroyESPData(data)
-    if data.highlight then data.highlight:Destroy() end
-    if data.billboard then data.billboard:Destroy() end
-    if data.box then data.box:Remove() end
-    if data.tracer then data.tracer:Remove() end
-end
 
 local function createESP(player)
     if player == LocalPlayer then return end
     local function setup(character)
         if not character or not character:FindFirstChild("HumanoidRootPart") or not character:FindFirstChild("Head") then return end
-        if espObjects[player] then destroyESPData(espObjects[player]) end
+        if espObjects[player] then
+            for _, obj in pairs(espObjects[player]) do
+                if typeof(obj) == "Instance" then obj:Destroy() elseif typeof(obj) == "Drawing" then obj:Remove() end
+            end
+        end
         local data = {}
         local highlight = Instance.new("Highlight")
         highlight.Adornee = character; highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
@@ -191,7 +157,7 @@ local function createESP(player)
         
         local billboard = Instance.new("BillboardGui")
         billboard.Adornee = character.Head; billboard.Size = UDim2.new(0, 200, 0, 50)
-        billboard.StudsOffset = Vector3.new(0, 2.5, 0); billboard.AlwaysOnTop = true; billboard.Enabled = Config.Name or Config.Distance; billboard.Parent = character.Head
+        billboard.StudsOffset = Vector3.new(0, 2.5, 0); billboard.AlwaysOnTop = true; billboard.Enabled = Config.Name; billboard.Parent = character.Head
         local textLabel = Instance.new("TextLabel")
         textLabel.Parent = billboard; textLabel.BackgroundTransparency = 1; textLabel.Size = UDim2.new(1, 0, 1, 0)
         textLabel.Font = Enum.Font.GothamBold; textLabel.TextColor3 = Config.Color; textLabel.TextStrokeTransparency = 0; textLabel.TextSize = 14
@@ -209,12 +175,39 @@ end
 
 for _, p in ipairs(Players:GetPlayers()) do createESP(p) end
 Players.PlayerAdded:Connect(createESP)
-Players.PlayerRemoving:Connect(function(player)
-    if espObjects[player] then destroyESPData(espObjects[player]); espObjects[player] = nil end
+
+-- ITEM ESP (Background Task)
+task.spawn(function()
+    while task.wait(2) do
+        if Config.ItemESP then
+            local LootNames = {"Loot", "Drop", "Item", "Crate", "Bag", "Weapon", "Gun", "Ammo", "Med", "Scrap", "Box"}
+            for _, obj in ipairs(workspace:GetChildren()) do
+                if (obj:IsA("BasePart") or obj:IsA("Model")) and not itemEspObjects[obj] then
+                    local isLoot = false
+                    local name = obj.Name:lower()
+                    for _, keyword in ipairs(LootNames) do if name:find(keyword:lower()) then isLoot = true break end end
+                    if isLoot then
+                        local isCharacter = false
+                        for _, p in ipairs(Players:GetPlayers()) do if p.Character == obj then isCharacter = true break end end
+                        if not isCharacter then
+                            local highlight = Instance.new("Highlight")
+                            highlight.Adornee = obj; highlight.FillColor = Color3.fromRGB(255, 215, 0); highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                            highlight.FillTransparency = 0.5; highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop; highlight.Parent = obj
+                            itemEspObjects[obj] = highlight
+                        end
+                    end
+                end
+            end
+            for obj, highlight in pairs(itemEspObjects) do
+                if not obj.Parent then highlight:Destroy(); itemEspObjects[obj] = nil end
+            end
+        else
+            for obj, highlight in pairs(itemEspObjects) do highlight:Destroy(); itemEspObjects[obj] = nil end
+        end
+    end
 end)
 
 RunService.RenderStepped:Connect(function()
-    -- FOV Circle
     if fovCircle then
         local showFov = (Config.SilentAim or Config.Aimbot) and Config.ShowFOV
         fovCircle.Visible = showFov
@@ -224,29 +217,29 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Instant Aimbot (Kamera Lock)
     if Config.Aimbot and not Config.SilentAim then
         local target = getClosestTarget(Config.FOV)
         if target and target.Character then
             local targetPart = target.Character:FindFirstChild("Head")
-            if targetPart then Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetPart.Position) end
+            if targetPart and (Camera.CFrame.Position - targetPart.Position).Magnitude > 5 then 
+                Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetPart.Position) 
+            end
         end
     end
 
-    -- ESP Render
     for player, data in pairs(espObjects) do
         local char = player.Character
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
         local head = char and char:FindFirstChild("Head")
+        
         if hrp and head and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
             local distance = (LocalPlayer.Character.HumanoidRootPart.Position - hrp.Position).Magnitude
             if data.highlight then data.highlight.Enabled = Config.Chams and Config.ESP and distance <= Config.MaxDist end
             if data.billboard then
-                data.billboard.Enabled = (Config.Name or Config.Distance) and Config.ESP and distance <= Config.MaxDist
+                data.billboard.Enabled = Config.Name and Config.ESP and distance <= Config.MaxDist
                 if data.textLabel then
-                    local txt = ""
-                    if Config.Name then txt = player.Name end
-                    if Config.Distance then if txt ~= "" then txt = txt .. " " end; txt = txt .. "[" .. math.floor(distance) .. "m]" end
+                    local txt = player.Name
+                    if Config.Distance then txt = txt .. " [" .. math.floor(distance) .. "m]" end
                     data.textLabel.Text = txt
                 end
             end
@@ -274,7 +267,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 end)
---[[ Part 4/4: GUI & Floating Buttons ]]
+--[[ Part 3/3: GUI ]]
 local function CreateToggle(parent, text, default, callback)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1,0,0,34); btn.BackgroundColor3 = Theme.Element; btn.BorderSizePixel = 0; btn.Text = ""; btn.Parent = parent
@@ -420,21 +413,13 @@ local function CreateTab(name, index)
             end
         end
     end)
-    if index == 1 then
-        page.Visible = true
-        btn.BackgroundColor3 = Theme.Accent; btn.TextColor3 = Theme.Text
-    end
+    if index == 1 then page.Visible = true; btn.BackgroundColor3 = Theme.Accent; btn.TextColor3 = Theme.Text end
 end
 
 CreateTab("Combat", 1); CreateTab("Visuals", 2); CreateTab("Misc", 3)
 
-CreateToggle(Pages["Combat"].Page, "Instant Aimbot (Lock)", Config.Aimbot, function(v) 
-    Config.Aimbot = v; if v then Config.SilentAim = false end; updateQuickAimVisual() 
-end)
-CreateToggle(Pages["Combat"].Page, "Silent Aim (Raycast)", Config.SilentAim, function(v) 
-    Config.SilentAim = v; if v then Config.Aimbot = false; updateQuickAimVisual() end 
-end)
-CreateToggle(Pages["Combat"].Page, "Wall Check", Config.WallCheck, function(v) Config.WallCheck = v end)
+CreateToggle(Pages["Combat"].Page, "Instant Aimbot (Lock)", Config.Aimbot, function(v) Config.Aimbot = v; if v then Config.SilentAim = false end; updateQuickAimVisual() end)
+CreateToggle(Pages["Combat"].Page, "Silent Aim (Remote)", Config.SilentAim, function(v) Config.SilentAim = v; if v then Config.Aimbot = false; updateQuickAimVisual() end end)
 CreateToggle(Pages["Combat"].Page, "Show FOV Circle", Config.ShowFOV, function(v) Config.ShowFOV = v end)
 CreateSlider(Pages["Combat"].Page, "FOV Size", 50, 500, Config.FOV, function(v) Config.FOV = v end)
 
