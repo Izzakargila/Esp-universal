@@ -1,5 +1,5 @@
 --[[ 
-    Fallen Survival | Mega Script (Player ESP, Item ESP, Fullbright, No Fog, No Weather)
+    Brisk Survival V1 / Fallen Survival | Mega Script (ESP + Silent Aim + Env)
     Executor: Delta
 ]]
 
@@ -11,8 +11,9 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local Drawing = Drawing or nil
 
--- State Config (Fitur baru ditambahkan di sini)
+-- State Config
 local Config = {
+    -- Player ESP
     ESP = true,
     Box = true,
     Tracer = true,
@@ -22,14 +23,18 @@ local Config = {
     MaxDist = 1000,
     Color = Color3.fromRGB(255, 50, 50),
     TracerOrigin = "Bottom",
-    -- Fitur Baru:
+    -- Item ESP
     ItemESP = true,
+    -- Environment
     Fullbright = true,
     NoFog = true,
-    NoWeather = true
+    NoWeather = true,
+    -- Combat
+    SilentAim = false,
+    FOV = 150
 }
 
--- Hapus GUI lama kalau ada
+-- Hapus GUI lama
 local oldGui = game.CoreGui:FindFirstChild("FallenESP_GUI")
 if oldGui then oldGui:Destroy() end
 
@@ -42,7 +47,7 @@ local espObjects = {}
 local itemEspObjects = {}
 
 -- ======================
--- FUNGSI DRAG
+-- FUNGSI DRAG GUI
 -- ======================
 local function MakeDraggable(frame)
     local dragging, dragInput, dragStart, startPos
@@ -64,10 +69,73 @@ local function MakeDraggable(frame)
     UserInputService.InputChanged:Connect(function(input)
         if input == dragInput and dragging then
             local delta = input.Position - dragStart
-            frame.Position = UDim2.new(startPos.X.Scale, startPos.XOffset + delta.X, startPos.Y.Scale, startPos.YOffset + delta.Y)
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
 end
+
+-- ======================
+-- COMBAT (SILENT AIM) LOGIC
+-- ======================
+local function getClosestPlayer()
+    local closest = nil
+    local shortestDistance = math.huge
+    local mousePos = UserInputService:GetMouseLocation()
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+            local head = player.Character:FindFirstChild("Head")
+            local hum = player.Character:FindFirstChildOfClass("Humanoid")
+            
+            if hrp and head and hum and hum.Health > 0 then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                if onScreen then
+                    local distToMouse = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    if distToMouse <= Config.FOV and distToMouse < shortestDistance then
+                        shortestDistance = distToMouse
+                        closest = player
+                    end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- Hook Metamethod untuk Silent Aim
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    
+    if not checkcaller() and Config.SilentAim then
+        -- Cek apakah ini remote event untuk nembak/mukul
+        if method == "FireServer" or method == "InvokeServer" then
+            local remoteName = self.Name:lower()
+            if remoteName:find("fire") or remoteName:find("shoot") or remoteName:find("hit") or remoteName:find("attack") or remoteName:find("damage") or remoteName:find("weapon") then
+                local target = getClosestPlayer()
+                if target and target.Character then
+                    local targetPart = target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
+                    if targetPart then
+                        -- Ganti argumen posisi/CFrame ke target
+                        for i, v in ipairs(args) do
+                            if typeof(v) == "Vector3" then
+                                args[i] = targetPart.Position
+                            elseif typeof(v) == "CFrame" then
+                                args[i] = CFrame.new(targetPart.Position)
+                            elseif typeof(v) == "Instance" and v:IsA("BasePart") then
+                                args[i] = targetPart
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    return oldNamecall(self, unpack(args))
+end)
 
 -- ======================
 -- ENVIRONMENT LOGIC (Fullbright, Fog, Weather)
@@ -110,7 +178,6 @@ local function applyEnvironment()
     end
 end
 
--- Loop untuk menjaga environment tetap berubah
 task.spawn(function()
     while task.wait(1) do
         pcall(applyEnvironment)
@@ -200,7 +267,6 @@ end
 
 RunService.Heartbeat:Connect(function()
     if not Config.ItemESP then
-        -- Hapus item ESP jika dimatikan
         for obj, data in pairs(itemEspObjects) do
             data.highlight:Destroy()
             data.billboard:Destroy()
@@ -405,8 +471,8 @@ MakeDraggable(ToggleBtn)
 
 local Main = Instance.new("Frame")
 Main.Name = "Main"
-Main.Size = UDim2.new(0, 220, 0, 420) -- Ukuran ditambah karena menu lebih banyak
-Main.Position = UDim2.new(0.5, -110, 0.5, -210)
+Main.Size = UDim2.new(0, 220, 0, 480) -- Lebih panjang karena ada menu Combat
+Main.Position = UDim2.new(0.5, -110, 0.5, -240)
 Main.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
 Main.BorderSizePixel = 0
 Main.Parent = ScreenGui
@@ -428,7 +494,7 @@ local TitleText = Instance.new("TextLabel")
 TitleText.Size = UDim2.new(1, -40, 1, 0)
 TitleText.Position = UDim2.new(0, 12, 0, 0)
 TitleText.BackgroundTransparency = 1
-TitleText.Text = "Mega ESP"
+TitleText.Text = "Mega ESP + Aim"
 TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleText.Font = Enum.Font.GothamBlack
 TitleText.TextSize = 15
@@ -460,74 +526,4 @@ local Scroll = Instance.new("ScrollingFrame")
 Scroll.Size = UDim2.new(1, -20, 1, -45)
 Scroll.Position = UDim2.new(0, 10, 0, 40)
 Scroll.BackgroundTransparency = 1
-Scroll.BorderSizePixel = 0
-Scroll.ScrollBarThickness = 3
-Scroll.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 90)
-Scroll.CanvasSize = UDim2.new(0, 0, 0, 500) -- Canvas diperpanjang
-Scroll.Parent = Main
-
-local Layout = Instance.new("UIListLayout")
-Layout.Padding = UDim.new(0, 6)
-Layout.SortOrder = Enum.SortOrder.LayoutOrder
-Layout.Parent = Scroll
-
--- BAGIAN PLAYER ESP
-local Section1 = Instance.new("TextLabel")
-Section1.Size = UDim2.new(1, 0, 0, 20)
-Section1.BackgroundTransparency = 1
-Section1.Text = "PLAYER VISUALS"
-Section1.TextColor3 = Color3.fromRGB(100, 150, 255)
-Section1.Font = Enum.Font.GothamBold
-Section1.TextSize = 11
-Section1.TextXAlignment = Enum.TextXAlignment.Left
-Section1.Parent = Scroll
-
-CreateToggle(Scroll, "Master Player ESP", Config.ESP, function(v) Config.ESP = v end)
-CreateToggle(Scroll, "Box ESP", Config.Box, function(v) Config.Box = v end)
-CreateToggle(Scroll, "Tracer ESP", Config.Tracer, function(v) Config.Tracer = v end)
-CreateToggle(Scroll, "Chams (Highlight)", Config.Chams, function(v) Config.Chams = v end)
-CreateToggle(Scroll, "Name & Distance", Config.Name, function(v) Config.Name = v; Config.Distance = v end)
-
--- BAGIAN ITEM ESP
-local Section2 = Instance.new("TextLabel")
-Section2.Size = UDim2.new(1, 0, 0, 20)
-Section2.BackgroundTransparency = 1
-Section2.Text = "ITEM ESP"
-Section2.TextColor3 = Color3.fromRGB(255, 215, 0)
-Section2.Font = Enum.Font.GothamBold
-Section2.TextSize = 11
-Section2.TextXAlignment = Enum.TextXAlignment.Left
-Section2.Parent = Scroll
-
-CreateToggle(Scroll, "Item/Loot ESP", Config.ItemESP, function(v) Config.ItemESP = v end)
-
--- BAGIAN ENVIRONMENT
-local Section3 = Instance.new("TextLabel")
-Section3.Size = UDim2.new(1, 0, 0, 20)
-Section3.BackgroundTransparency = 1
-Section3.Text = "ENVIRONMENT"
-Section3.TextColor3 = Color3.fromRGB(0, 255, 150)
-Section3.Font = Enum.Font.GothamBold
-Section3.TextSize = 11
-Section3.TextXAlignment = Enum.TextXAlignment.Left
-Section3.Parent = Scroll
-
-CreateToggle(Scroll, "Fullbright", Config.Fullbright, function(v) Config.Fullbright = v end)
-CreateToggle(Scroll, "No Fog", Config.NoFog, function(v) Config.NoFog = v end)
-CreateToggle(Scroll, "No Weather", Config.NoWeather, function(v) Config.NoWeather = v end)
-
--- BAGIAN SETTINGS
-local Section4 = Instance.new("TextLabel")
-Section4.Size = UDim2.new(1, 0, 0, 20)
-Section4.BackgroundTransparency = 1
-Section4.Text = "SETTINGS"
-Section4.TextColor3 = Color3.fromRGB(100, 150, 255)
-Section4.Font = Enum.Font.GothamBold
-Section4.TextSize = 11
-Section4.TextXAlignment = Enum.TextXAlignment.Left
-Section4.Parent = Scroll
-
-CreateColorPicker(Scroll, "Player Color", function(c) Config.Color = c end)
-
--- Max Distance Box
-local distFrame = Instance.new("F
+Scroll.BorderSize
