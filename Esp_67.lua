@@ -1,6 +1,5 @@
 --[[ 
-    Brisk Survival Script | Premium UI Edition
-    Features: Player ESP, Item ESP, Silent Aim, FOV Circle, Environment Mods
+    Brisk Survival Script | Premium UI Edition (Part 1/3)
 ]]
 
 local Players = game:GetService("Players")
@@ -12,32 +11,26 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local Drawing = Drawing or nil
 
--- ======================
 -- THEME & CONFIG
--- ======================
 local Theme = {
     Background = Color3.fromRGB(12, 12, 15),
     TopBar = Color3.fromRGB(20, 20, 25),
     Element = Color3.fromRGB(28, 28, 35),
     ElementHover = Color3.fromRGB(38, 38, 48),
-    Accent = Color3.fromRGB(138, 43, 226), -- Purple
+    Accent = Color3.fromRGB(138, 43, 226),
     AccentOff = Color3.fromRGB(60, 60, 70),
     Text = Color3.fromRGB(240, 240, 245),
     TextDim = Color3.fromRGB(150, 150, 160)
 }
 
 local Config = {
-    -- ESP
     ESP = true, Box = true, Tracer = true, Chams = true, Name = true, Distance = true, MaxDist = 1000,
     Color = Color3.fromRGB(255, 50, 50), TracerOrigin = "Bottom",
     ItemESP = true,
-    -- Environment
     Fullbright = true, NoFog = true, NoWeather = true,
-    -- Combat
     SilentAim = false, ShowFOV = true, FOV = 150
 }
 
--- Cleanup old GUI
 local oldGui = game.CoreGui:FindFirstChild("BriskSurvivalScript")
 if oldGui then oldGui:Destroy() end
 
@@ -49,9 +42,7 @@ ScreenGui.Parent = game.CoreGui
 local espObjects = {}
 local itemEspObjects = {}
 
--- ======================
 -- FOV CIRCLE
--- ======================
 local fovCircle
 if Drawing then
     fovCircle = Drawing.new("Circle")
@@ -62,9 +53,7 @@ if Drawing then
     fovCircle.Visible = false
 end
 
--- ======================
 -- UTILITIES
--- ======================
 local function MakeDraggable(frame)
     local dragging, dragInput, dragStart, startPos
     frame.InputBegan:Connect(function(input)
@@ -86,9 +75,7 @@ local function MakeDraggable(frame)
     end)
 end
 
--- ======================
 -- COMBAT (SILENT AIM)
--- ======================
 local function getClosestPlayer()
     local closest = nil
     local shortestDistance = math.huge
@@ -140,10 +127,11 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local success, result = pcall(oldNamecall, self, unpack(args))
     if success then return result else return oldNamecall(self, ...) end
 end)
+--[[ 
+    Brisk Survival Script (Part 2/3)
+]]
 
--- ======================
 -- ENVIRONMENT LOGIC
--- ======================
 local function applyEnvironment()
     if Config.Fullbright then
         Lighting.Ambient = Color3.fromRGB(255, 255, 255); Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255); Lighting.Brightness = 2; Lighting.GlobalShadows = false
@@ -165,9 +153,7 @@ end
 
 task.spawn(function() while task.wait(1) do pcall(applyEnvironment) end end)
 
--- ======================
 -- ESP LOGIC
--- ======================
 local function createESP(player)
     if player == LocalPlayer then return end
     local function setup(character)
@@ -286,10 +272,11 @@ RunService.RenderStepped:Connect(function()
         end
     end
 end)
+--[[ 
+    Brisk Survival Script (Part 3/3)
+]]
 
--- ======================
 -- PREMIUM GUI BUILDER
--- ======================
 local function CreateToggle(parent, text, default, callback)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, 0, 0, 36)
@@ -410,7 +397,6 @@ local function CreateColorPicker(parent, text, callback)
     end)
 end
 
--- Floating Button (Minimize)
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(0, 50, 0, 50); ToggleBtn.Position = UDim2.new(0.05, 0, 0.2, 0)
 ToggleBtn.BackgroundColor3 = Theme.Background; ToggleBtn.Text = "BSS"; ToggleBtn.TextColor3 = Theme.Accent
@@ -419,8 +405,91 @@ Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 12)
 local toggleStroke = Instance.new("UIStroke", ToggleBtn); toggleStroke.Color = Theme.Accent; toggleStroke.Thickness = 2
 MakeDraggable(ToggleBtn)
 
--- Main Window
 local Main = Instance.new("Frame")
 Main.Size = UDim2.new(0, 280, 0, 420); Main.Position = UDim2.new(0.5, -140, 0.5, -210)
 Main.BackgroundColor3 = Theme.Background; Main.BorderSizePixel = 0; Main.Parent = ScreenGui
-Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10); MakeDraggable
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10); MakeDraggable(Main)
+local stroke = Instance.new("UIStroke", Main); stroke.Color = Theme.Accent; stroke.Thickness = 1.5; stroke.Transparency = 0.5
+
+local Title = Instance.new("Frame")
+Title.Size = UDim2.new(1, 0, 0, 40); Title.BackgroundColor3 = Theme.TopBar; Title.BorderSizePixel = 0; Title.Parent = Main
+Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 10)
+local fix = Instance.new("Frame"); fix.Size = UDim2.new(1, 0, 0, 10); fix.Position = UDim2.new(0, 0, 1, -10); fix.BackgroundColor3 = Theme.TopBar; fix.BorderSizePixel = 0; fix.Parent = Title
+
+local TitleText = Instance.new("TextLabel")
+TitleText.Size = UDim2.new(1, -40, 1, 0); TitleText.Position = UDim2.new(0, 15, 0, 0); TitleText.BackgroundTransparency = 1
+TitleText.Text = "Brisk Survival Script"; TitleText.TextColor3 = Theme.Text; TitleText.Font = Enum.Font.GothamBold
+TitleText.TextSize = 15; TitleText.TextXAlignment = Enum.TextXAlignment.Left; TitleText.Parent = Title
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 30, 0, 30); CloseBtn.Position = UDim2.new(1, -38, 0.5, -15); CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+CloseBtn.Text = "X"; CloseBtn.TextColor3 = Theme.Text; CloseBtn.Font = Enum.Font.GothamBold; CloseBtn.TextSize = 12
+CloseBtn.Parent = Title; Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
+CloseBtn.MouseButton1Click:Connect(function() Main.Visible = false; ToggleBtn.Visible = true end)
+ToggleBtn.MouseButton1Click:Connect(function() Main.Visible = true; ToggleBtn.Visible = false end)
+
+local TabBar = Instance.new("Frame")
+TabBar.Size = UDim2.new(1, -20, 0, 30); TabBar.Position = UDim2.new(0, 10, 0, 48)
+TabBar.BackgroundTransparency = 1; TabBar.Parent = Main
+local TabLayout = Instance.new("UIListLayout"); TabLayout.FillDirection = Enum.FillDirection.Horizontal; TabLayout.Padding = UDim.new(0, 5); TabLayout.Parent = TabBar
+
+local Pages = {}
+local function CreateTab(name, index)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 80, 1, 0); btn.BackgroundColor3 = Theme.Element; btn.Text = name
+    btn.TextColor3 = Theme.TextDim; btn.Font = Enum.Font.GothamMedium; btn.TextSize = 12
+    btn.Parent = TabBar; Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    
+    local page = Instance.new("ScrollingFrame")
+    page.Size = UDim2.new(1, -20, 1, -90); page.Position = UDim2.new(0, 10, 0, 85)
+    page.BackgroundTransparency = 1; page.BorderSizePixel = 0
+    page.ScrollBarThickness = 3; page.ScrollBarImageColor3 = Theme.Accent
+    page.CanvasSize = UDim2.new(0, 0, 0, 0); page.Visible = false; page.Parent = Main
+    local pageLayout = Instance.new("UIListLayout"); pageLayout.Padding = UDim.new(0, 8); pageLayout.Parent = page
+    
+    Pages[name] = {Btn = btn, Page = page, Layout = pageLayout}
+    
+    btn.MouseButton1Click:Connect(function()
+        for n, obj in pairs(Pages) do
+            if n == name then
+                obj.Page.Visible = true
+                TweenService:Create(obj.Btn, TweenInfo.new(0.2), {BackgroundColor3 = Theme.Accent, TextColor3 = Theme.Text}):Play()
+            else
+                obj.Page.Visible = false
+                TweenService:Create(obj.Btn, TweenInfo.new(0.2), {BackgroundColor3 = Theme.Element, TextColor3 = Theme.TextDim}):Play()
+            end
+        end
+    end)
+    
+    if index == 1 then
+        page.Visible = true
+        btn.BackgroundColor3 = Theme.Accent; btn.TextColor3 = Theme.Text
+    end
+end
+
+CreateTab("Combat", 1)
+CreateTab("Visuals", 2)
+CreateTab("Misc", 3)
+
+CreateToggle(Pages["Combat"].Page, "Silent Aim", Config.SilentAim, function(v) Config.SilentAim = v end)
+CreateToggle(Pages["Combat"].Page, "Show FOV Circle", Config.ShowFOV, function(v) Config.ShowFOV = v end)
+CreateTextBox(Pages["Combat"].Page, "Aim FOV Size (px)", Config.FOV, function(v) Config.FOV = v end)
+
+CreateToggle(Pages["Visuals"].Page, "Master Player ESP", Config.ESP, function(v) Config.ESP = v end)
+CreateToggle(Pages["Visuals"].Page, "Box ESP", Config.Box, function(v) Config.Box = v end)
+CreateToggle(Pages["Visuals"].Page, "Tracer ESP", Config.Tracer, function(v) Config.Tracer = v end)
+CreateToggle(Pages["Visuals"].Page, "Chams (Highlight)", Config.Chams, function(v) Config.Chams = v end)
+CreateToggle(Pages["Visuals"].Page, "Name & Distance", Config.Name, function(v) Config.Name = v; Config.Distance = v end)
+CreateToggle(Pages["Visuals"].Page, "Item/Loot ESP", Config.ItemESP, function(v) Config.ItemESP = v end)
+CreateColorPicker(Pages["Visuals"].Page, "Player ESP Color", function(c) Config.Color = c end)
+CreateTextBox(Pages["Visuals"].Page, "Max Distance (studs)", Config.MaxDist, function(v) Config.MaxDist = v end)
+
+CreateToggle(Pages["Misc"].Page, "Fullbright", Config.Fullbright, function(v) Config.Fullbright = v end)
+CreateToggle(Pages["Misc"].Page, "No Fog", Config.NoFog, function(v) Config.NoFog = v end)
+CreateToggle(Pages["Misc"].Page, "No Weather", Config.NoWeather, function(v) Config.NoWeather = v end)
+
+for _, t in pairs(Pages) do
+    t.Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        t.Page.CanvasSize = UDim2.new(0, 0, 0, t.Layout.AbsoluteContentSize.Y + 20)
+    end)
+end
