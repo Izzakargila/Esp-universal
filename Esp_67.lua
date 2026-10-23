@@ -1,28 +1,48 @@
 --[[ 
-    Brisk Survival V1 / Fallen Survival | Mega Script V2 (Fix Silent Aim + FOV Circle)
+    Brisk Survival Script | Premium UI Edition
+    Features: Player ESP, Item ESP, Silent Aim, FOV Circle, Environment Mods
 ]]
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local Drawing = Drawing or nil
 
+-- ======================
+-- THEME & CONFIG
+-- ======================
+local Theme = {
+    Background = Color3.fromRGB(12, 12, 15),
+    TopBar = Color3.fromRGB(20, 20, 25),
+    Element = Color3.fromRGB(28, 28, 35),
+    ElementHover = Color3.fromRGB(38, 38, 48),
+    Accent = Color3.fromRGB(138, 43, 226), -- Purple
+    AccentOff = Color3.fromRGB(60, 60, 70),
+    Text = Color3.fromRGB(240, 240, 245),
+    TextDim = Color3.fromRGB(150, 150, 160)
+}
+
 local Config = {
+    -- ESP
     ESP = true, Box = true, Tracer = true, Chams = true, Name = true, Distance = true, MaxDist = 1000,
     Color = Color3.fromRGB(255, 50, 50), TracerOrigin = "Bottom",
     ItemESP = true,
+    -- Environment
     Fullbright = true, NoFog = true, NoWeather = true,
+    -- Combat
     SilentAim = false, ShowFOV = true, FOV = 150
 }
 
-local oldGui = game.CoreGui:FindFirstChild("FallenESP_GUI")
+-- Cleanup old GUI
+local oldGui = game.CoreGui:FindFirstChild("BriskSurvivalScript")
 if oldGui then oldGui:Destroy() end
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "FallenESP_GUI"
+ScreenGui.Name = "BriskSurvivalScript"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = game.CoreGui
 
@@ -30,20 +50,20 @@ local espObjects = {}
 local itemEspObjects = {}
 
 -- ======================
--- FOV CIRCLE (Lingkaran Putih di layar)
+-- FOV CIRCLE
 -- ======================
 local fovCircle
 if Drawing then
     fovCircle = Drawing.new("Circle")
     fovCircle.Thickness = 1.5
-    fovCircle.Color = Color3.fromRGB(255, 255, 255)
+    fovCircle.Color = Theme.Accent
     fovCircle.Filled = false
     fovCircle.Transparency = 0.8
     fovCircle.Visible = false
 end
 
 -- ======================
--- FUNGSI DRAG GUI
+-- UTILITIES
 -- ======================
 local function MakeDraggable(frame)
     local dragging, dragInput, dragStart, startPos
@@ -67,7 +87,7 @@ local function MakeDraggable(frame)
 end
 
 -- ======================
--- COMBAT (SILENT AIM & FOV) LOGIC
+-- COMBAT (SILENT AIM)
 -- ======================
 local function getClosestPlayer()
     local closest = nil
@@ -78,11 +98,9 @@ local function getClosestPlayer()
         if player ~= LocalPlayer and player.Character then
             local head = player.Character:FindFirstChild("Head")
             local hum = player.Character:FindFirstChildOfClass("Humanoid")
-            
             if head and hum and hum.Health > 0 then
                 local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
                 if onScreen then
-                    -- Hitung jarak antara mouse dan kepala musuh di layar
                     local distToMouse = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
                     if distToMouse <= Config.FOV and distToMouse < shortestDistance then
                         shortestDistance = distToMouse
@@ -101,34 +119,24 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local args = {...}
     
     if not checkcaller() and Config.SilentAim and (method == "FireServer" or method == "InvokeServer") then
-        -- Cek apakah remote ini untuk nembak/mukul
         local remoteName = self.Name:lower()
         if remoteName:find("fire") or remoteName:find("shoot") or remoteName:find("hit") or remoteName:find("attack") or remoteName:find("weapon") or remoteName:find("damage") then
-            
             local target = getClosestPlayer()
             if target and target.Character then
                 local targetPart = target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
                 if targetPart then
-                    -- LOGIKA AMAN: Hanya ubah arah (Vector3/CFrame), jangan ubah titik asal
                     if typeof(args[1]) == "Vector3" then
-                        -- Jika argumen 1 adalah target posisi
                         args[1] = targetPart.Position
                     elseif typeof(args[1]) == "CFrame" then
-                        -- Jika argumen 1 adalah CFrame origin, kita ubah rotasinya agar menghadap target
                         args[1] = CFrame.lookAt(args[1].Position, targetPart.Position)
                     end
-                    
-                    -- Jika ada argumen kedua yang berupa arah (Direction)
                     if typeof(args[2]) == "Vector3" and typeof(args[1]) == "Vector3" then
-                        local origin = args[1]
-                        args[2] = (targetPart.Position - origin).Unit
+                        args[2] = (targetPart.Position - args[1]).Unit
                     end
                 end
             end
         end
     end
-    
-    -- Pcall agar kalau error, game tidak crash (tetap nembak normal)
     local success, result = pcall(oldNamecall, self, unpack(args))
     if success then return result else return oldNamecall(self, ...) end
 end)
@@ -155,12 +163,10 @@ local function applyEnvironment()
     end
 end
 
-task.spawn(function()
-    while task.wait(1) do pcall(applyEnvironment) end
-end)
+task.spawn(function() while task.wait(1) do pcall(applyEnvironment) end end)
 
 -- ======================
--- ESP LOGIC (Player & Item) & UPDATE LOOP
+-- ESP LOGIC
 -- ======================
 local function createESP(player)
     if player == LocalPlayer then return end
@@ -173,12 +179,12 @@ local function createESP(player)
         end
         local data = {}
         local highlight = Instance.new("Highlight")
-        highlight.Name = "FallenESP_Chams"; highlight.Adornee = character; highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.Adornee = character; highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
         highlight.FillTransparency = 0.5; highlight.OutlineTransparency = 0; highlight.FillColor = Config.Color; highlight.OutlineColor = Config.Color
         highlight.Enabled = Config.Chams; highlight.Parent = character; data.highlight = highlight
         
         local billboard = Instance.new("BillboardGui")
-        billboard.Name = "FallenESP_Billboard"; billboard.Adornee = character.Head; billboard.Size = UDim2.new(0, 200, 0, 50)
+        billboard.Adornee = character.Head; billboard.Size = UDim2.new(0, 200, 0, 50)
         billboard.StudsOffset = Vector3.new(0, 2.5, 0); billboard.AlwaysOnTop = true; billboard.Enabled = Config.Name or Config.Distance; billboard.Parent = character.Head
         local textLabel = Instance.new("TextLabel")
         textLabel.Parent = billboard; textLabel.BackgroundTransparency = 1; textLabel.Size = UDim2.new(1, 0, 1, 0)
@@ -207,7 +213,6 @@ local function isLoot(obj)
 end
 
 RunService.Heartbeat:Connect(function()
-    -- Item ESP
     if not Config.ItemESP then
         for obj, data in pairs(itemEspObjects) do data.highlight:Destroy(); data.billboard:Destroy(); itemEspObjects[obj] = nil end
     else
@@ -235,18 +240,12 @@ RunService.Heartbeat:Connect(function()
 end)
 
 RunService.RenderStepped:Connect(function()
-    -- Update FOV Circle
     if fovCircle then
         if Config.SilentAim and Config.ShowFOV then
-            fovCircle.Visible = true
-            fovCircle.Position = UserInputService:GetMouseLocation()
-            fovCircle.Radius = Config.FOV
-        else
-            fovCircle.Visible = false
-        end
+            fovCircle.Visible = true; fovCircle.Position = UserInputService:GetMouseLocation(); fovCircle.Radius = Config.FOV
+        else fovCircle.Visible = false end
     end
 
-    -- Update Player ESP
     for player, data in pairs(espObjects) do
         local char = player.Character
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -289,76 +288,139 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ======================
--- GUI BUILDER
+-- PREMIUM GUI BUILDER
 -- ======================
 local function CreateToggle(parent, text, default, callback)
-    local btn = Instance.new("TextButton"); btn.Size = UDim2.new(1, -10, 0, 30)
-    btn.BackgroundColor3 = default and Color3.fromRGB(40, 40, 45) or Color3.fromRGB(25, 25, 30); btn.BorderSizePixel = 0
-    btn.Text = "  " .. text .. (default and " [ON]" or " [OFF]")
-    btn.TextColor3 = default and Color3.fromRGB(0, 255, 100) or Color3.fromRGB(150, 150, 150)
-    btn.TextXAlignment = Enum.TextXAlignment.Left; btn.Font = Enum.Font.GothamSemibold; btn.TextSize = 13; btn.Parent = parent
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 0, 36)
+    btn.BackgroundColor3 = Theme.Element
+    btn.BorderSizePixel = 0
+    btn.Text = ""
+    btn.Parent = parent
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -50, 1, 0)
+    lbl.Position = UDim2.new(0, 12, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.TextColor3 = Theme.Text
+    lbl.Font = Enum.Font.GothamMedium
+    lbl.TextSize = 13
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = btn
+    
+    local pill = Instance.new("Frame")
+    pill.Size = UDim2.new(0, 34, 0, 18)
+    pill.Position = UDim2.new(1, -46, 0.5, -9)
+    pill.BackgroundColor3 = default and Theme.Accent or Theme.AccentOff
+    pill.Parent = btn
+    Instance.new("UICorner", pill).CornerRadius = UDim.new(1, 0)
+    
+    local circle = Instance.new("Frame")
+    circle.Size = UDim2.new(0, 14, 0, 14)
+    circle.Position = default and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)
+    circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    circle.Parent = pill
+    Instance.new("UICorner", circle).CornerRadius = UDim.new(1, 0)
+    
     local state = default
+    btn.MouseEnter:Connect(function() TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Theme.ElementHover}):Play() end)
+    btn.MouseLeave:Connect(function() TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Theme.Element}):Play() end)
+    
     btn.MouseButton1Click:Connect(function()
-        state = not state; btn.Text = "  " .. text .. (state and " [ON]" or " [OFF]")
-        btn.TextColor3 = state and Color3.fromRGB(0, 255, 100) or Color3.fromRGB(150, 150, 150)
-        btn.BackgroundColor3 = state and Color3.fromRGB(40, 40, 45) or Color3.fromRGB(25, 25, 30); callback(state)
+        state = not state
+        TweenService:Create(pill, TweenInfo.new(0.2), {BackgroundColor3 = state and Theme.Accent or Theme.AccentOff}):Play()
+        TweenService:Create(circle, TweenInfo.new(0.2), {Position = state and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)}):Play()
+        callback(state)
     end)
 end
 
+local function CreateTextBox(parent, text, default, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 50)
+    frame.BackgroundColor3 = Theme.Element
+    frame.BorderSizePixel = 0
+    frame.Parent = parent
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+    
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -20, 0, 20)
+    lbl.Position = UDim2.new(0, 12, 0, 6)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.TextColor3 = Theme.TextDim
+    lbl.Font = Enum.Font.GothamMedium
+    lbl.TextSize = 12
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = frame
+    
+    local box = Instance.new("TextBox")
+    box.Size = UDim2.new(1, -20, 0, 18)
+    box.Position = UDim2.new(0, 12, 0, 26)
+    box.BackgroundTransparency = 1
+    box.Text = tostring(default)
+    box.TextColor3 = Theme.Text
+    box.Font = Enum.Font.GothamBold
+    box.TextSize = 13
+    box.TextXAlignment = Enum.TextXAlignment.Left
+    box.Parent = frame
+    
+    box.FocusLost:Connect(function()
+        local num = tonumber(box.Text)
+        if num then callback(num) else box.Text = tostring(default) end
+    end)
+end
+
+local function CreateColorPicker(parent, text, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 0, 36)
+    btn.BackgroundColor3 = Theme.Element
+    btn.BorderSizePixel = 0
+    btn.Text = ""
+    btn.Parent = parent
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -50, 1, 0)
+    lbl.Position = UDim2.new(0, 12, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.TextColor3 = Theme.Text
+    lbl.Font = Enum.Font.GothamMedium
+    lbl.TextSize = 13
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = btn
+    
+    local colorBox = Instance.new("Frame")
+    colorBox.Size = UDim2.new(0, 20, 0, 20)
+    colorBox.Position = UDim2.new(1, -32, 0.5, -10)
+    colorBox.BackgroundColor3 = Config.Color
+    colorBox.Parent = btn
+    Instance.new("UICorner", colorBox).CornerRadius = UDim.new(0, 4)
+    
+    btn.MouseEnter:Connect(function() TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Theme.ElementHover}):Play() end)
+    btn.MouseLeave:Connect(function() TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Theme.Element}):Play() end)
+    
+    btn.MouseButton1Click:Connect(function()
+        local colors = {Color3.fromRGB(255, 50, 50), Color3.fromRGB(50, 255, 50), Color3.fromRGB(50, 50, 255), Color3.fromRGB(255, 255, 50), Color3.fromRGB(255, 50, 255), Color3.fromRGB(255, 255, 255)}
+        local current = Config.Color; local nextColor = colors[1]
+        for i, c in ipairs(colors) do if c == current then nextColor = colors[i % #colors + 1] break end end
+        Config.Color = nextColor; colorBox.BackgroundColor3 = nextColor; callback(nextColor)
+    end)
+end
+
+-- Floating Button (Minimize)
 local ToggleBtn = Instance.new("TextButton")
-ToggleBtn.Size = UDim2.new(0, 45, 0, 45); ToggleBtn.Position = UDim2.new(0.1, 0, 0.2, 0)
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 22); ToggleBtn.Text = "ESP"; ToggleBtn.TextColor3 = Color3.fromRGB(0, 255, 100)
-ToggleBtn.Font = Enum.Font.GothamBlack; ToggleBtn.TextSize = 14; ToggleBtn.Parent = ScreenGui; ToggleBtn.Visible = false
-Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 8)
-local toggleStroke = Instance.new("UIStroke", ToggleBtn); toggleStroke.Color = Color3.fromRGB(0, 255, 100); toggleStroke.Thickness = 2
+ToggleBtn.Size = UDim2.new(0, 50, 0, 50); ToggleBtn.Position = UDim2.new(0.05, 0, 0.2, 0)
+ToggleBtn.BackgroundColor3 = Theme.Background; ToggleBtn.Text = "BSS"; ToggleBtn.TextColor3 = Theme.Accent
+ToggleBtn.Font = Enum.Font.GothamBlack; ToggleBtn.TextSize = 16; ToggleBtn.Parent = ScreenGui; ToggleBtn.Visible = false
+Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 12)
+local toggleStroke = Instance.new("UIStroke", ToggleBtn); toggleStroke.Color = Theme.Accent; toggleStroke.Thickness = 2
 MakeDraggable(ToggleBtn)
 
+-- Main Window
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 220, 0, 480); Main.Position = UDim2.new(0.5, -110, 0.5, -240)
-Main.BackgroundColor3 = Color3.fromRGB(18, 18, 22); Main.BorderSizePixel = 0; Main.Parent = ScreenGui
-Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 8); MakeDraggable(Main)
-local stroke = Instance.new("UIStroke", Main); stroke.Color = Color3.fromRGB(60, 60, 70); stroke.Thickness = 1
-
-local Title = Instance.new("Frame")
-Title.Size = UDim2.new(1, 0, 0, 35); Title.BackgroundColor3 = Color3.fromRGB(25, 25, 32); Title.BorderSizePixel = 0; Title.Parent = Main
-Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 8)
-local TitleText = Instance.new("TextLabel")
-TitleText.Size = UDim2.new(1, -40, 1, 0); TitleText.Position = UDim2.new(0, 12, 0, 0); TitleText.BackgroundTransparency = 1
-TitleText.Text = "Mega Script V2"; TitleText.TextColor3 = Color3.fromRGB(255, 255, 255); TitleText.Font = Enum.Font.GothamBlack
-TitleText.TextSize = 15; TitleText.TextXAlignment = Enum.TextXAlignment.Left; TitleText.Parent = Title
-
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 25, 0, 25); CloseBtn.Position = UDim2.new(1, -32, 0.5, -12.5); CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-CloseBtn.Text = "X"; CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255); CloseBtn.Font = Enum.Font.GothamBold; CloseBtn.TextSize = 12
-CloseBtn.Parent = Title; Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 4)
-CloseBtn.MouseButton1Click:Connect(function() Main.Visible = false; ToggleBtn.Visible = true end)
-ToggleBtn.MouseButton1Click:Connect(function() Main.Visible = true; ToggleBtn.Visible = false end)
-
-local Scroll = Instance.new("ScrollingFrame")
-Scroll.Size = UDim2.new(1, -20, 1, -45); Scroll.Position = UDim2.new(0, 10, 0, 40); Scroll.BackgroundTransparency = 1
-Scroll.BorderSizePixel = 0; Scroll.ScrollBarThickness = 3; Scroll.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 90)
-Scroll.CanvasSize = UDim2.new(0, 0, 0, 600); Scroll.Parent = Main
-local Layout = Instance.new("UIListLayout"); Layout.Padding = UDim.new(0, 6); Layout.SortOrder = Enum.SortOrder.LayoutOrder; Layout.Parent = Scroll
-
--- COMBAT
-local SectionC = Instance.new("TextLabel")
-SectionC.Size = UDim2.new(1, 0, 0, 20); SectionC.BackgroundTransparency = 1; SectionC.Text = "COMBAT"
-SectionC.TextColor3 = Color3.fromRGB(255, 50, 150); SectionC.Font = Enum.Font.GothamBold; SectionC.TextSize = 11; SectionC.TextXAlignment = Enum.TextXAlignment.Left; SectionC.Parent = Scroll
-
-CreateToggle(Scroll, "Silent Aim", Config.SilentAim, function(v) Config.SilentAim = v end)
-CreateToggle(Scroll, "Show FOV Circle", Config.ShowFOV, function(v) Config.ShowFOV = v end)
-
-local fovFrame = Instance.new("Frame")
-fovFrame.Size = UDim2.new(1, -10, 0, 50); fovFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30); fovFrame.BorderSizePixel = 0; fovFrame.Parent = Scroll
-Instance.new("UICorner", fovFrame).CornerRadius = UDim.new(0, 6)
-local fovLabel = Instance.new("TextLabel")
-fovLabel.Size = UDim2.new(1, -20, 0, 20); fovLabel.Position = UDim2.new(0, 10, 0, 5); fovLabel.BackgroundTransparency = 1
-fovLabel.Text = "Aim FOV Size: " .. Config.FOV; fovLabel.TextColor3 = Color3.fromRGB(200, 200, 200); fovLabel.Font = Enum.Font.GothamSemibold; fovLabel.TextSize = 12; fovLabel.TextXAlignment = Enum.TextXAlignment.Left; fovLabel.Parent = fovFrame
-local fovBox = Instance.new("TextBox")
-fovBox.Size = UDim2.new(1, -20, 0, 18); fovBox.Position = UDim2.new(0, 10, 0, 27); fovBox.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
-fovBox.Text = tostring(Config.FOV); fovBox.TextColor3 = Color3.fromRGB(255, 255, 255); fovBox.Font = Enum.Font.Gotham; fovBox.TextSize = 11; fovBox.Parent = fovFrame
-Instance.new("UICorner", fovBox).CornerRadius = UDim.new(0, 4)
-fovBox.FocusLost:Connect(function()
-    local num = tonumber(fovBox.Text)
-    if num then Config.FOV = num; fovLabel.Text = "Aim FOV Size: "
+Main.Size = UDim2.new(0, 280, 0, 420); Main.Position = UDim2.new(0.5, -140, 0.5, -210)
+Main.BackgroundColor3 = Theme.Background; Main.BorderSizePixel = 0; Main.Parent = ScreenGui
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10); MakeDraggable
