@@ -1,5 +1,5 @@
 --[[ 
-    Brisk Survival Script | Premium UI Edition (Part 1/3)
+    Brisk Survival Script | Rectangular UI (Part 1/3)
 ]]
 
 local Players = game:GetService("Players")
@@ -11,16 +11,15 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local Drawing = Drawing or nil
 
--- THEME & CONFIG
 local Theme = {
-    Background = Color3.fromRGB(12, 12, 15),
-    TopBar = Color3.fromRGB(20, 20, 25),
-    Element = Color3.fromRGB(28, 28, 35),
-    ElementHover = Color3.fromRGB(38, 38, 48),
-    Accent = Color3.fromRGB(138, 43, 226),
+    Background = Color3.fromRGB(15, 15, 18),
+    SideBar = Color3.fromRGB(20, 20, 25),
+    Element = Color3.fromRGB(30, 30, 38),
+    ElementHover = Color3.fromRGB(45, 45, 55),
+    Accent = Color3.fromRGB(0, 170, 255), -- Cyan/Blue
     AccentOff = Color3.fromRGB(60, 60, 70),
     Text = Color3.fromRGB(240, 240, 245),
-    TextDim = Color3.fromRGB(150, 150, 160)
+    TextDim = Color3.fromRGB(140, 140, 150)
 }
 
 local Config = {
@@ -42,7 +41,7 @@ ScreenGui.Parent = game.CoreGui
 local espObjects = {}
 local itemEspObjects = {}
 
--- FOV CIRCLE
+-- FOV CIRCLE (Dikunci di tengah layar)
 local fovCircle
 if Drawing then
     fovCircle = Drawing.new("Circle")
@@ -75,11 +74,12 @@ local function MakeDraggable(frame)
     end)
 end
 
--- COMBAT (SILENT AIM)
+-- COMBAT (SILENT AIM MOBILE FIX)
 local function getClosestPlayer()
     local closest = nil
     local shortestDistance = math.huge
-    local mousePos = UserInputService:GetMouseLocation()
+    -- Gunakan titik tengah layar, bukan posisi jari
+    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
     
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
@@ -88,9 +88,9 @@ local function getClosestPlayer()
             if head and hum and hum.Health > 0 then
                 local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
                 if onScreen then
-                    local distToMouse = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-                    if distToMouse <= Config.FOV and distToMouse < shortestDistance then
-                        shortestDistance = distToMouse
+                    local distToCenter = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
+                    if distToCenter <= Config.FOV and distToCenter < shortestDistance then
+                        shortestDistance = distToCenter
                         closest = player
                     end
                 end
@@ -131,7 +131,6 @@ end)
     Brisk Survival Script (Part 2/3)
 ]]
 
--- ENVIRONMENT LOGIC
 local function applyEnvironment()
     if Config.Fullbright then
         Lighting.Ambient = Color3.fromRGB(255, 255, 255); Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255); Lighting.Brightness = 2; Lighting.GlobalShadows = false
@@ -153,7 +152,6 @@ end
 
 task.spawn(function() while task.wait(1) do pcall(applyEnvironment) end end)
 
--- ESP LOGIC
 local function createESP(player)
     if player == LocalPlayer then return end
     local function setup(character)
@@ -226,9 +224,12 @@ RunService.Heartbeat:Connect(function()
 end)
 
 RunService.RenderStepped:Connect(function()
+    -- FOV Circle di tengah layar
     if fovCircle then
         if Config.SilentAim and Config.ShowFOV then
-            fovCircle.Visible = true; fovCircle.Position = UserInputService:GetMouseLocation(); fovCircle.Radius = Config.FOV
+            fovCircle.Visible = true
+            fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+            fovCircle.Radius = Config.FOV
         else fovCircle.Visible = false end
     end
 
@@ -276,10 +277,9 @@ end)
     Brisk Survival Script (Part 3/3)
 ]]
 
--- PREMIUM GUI BUILDER
 local function CreateToggle(parent, text, default, callback)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, 36)
+    btn.Size = UDim2.new(1, 0, 0, 32)
     btn.BackgroundColor3 = Theme.Element
     btn.BorderSizePixel = 0
     btn.Text = ""
@@ -287,28 +287,19 @@ local function CreateToggle(parent, text, default, callback)
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
     
     local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -50, 1, 0)
-    lbl.Position = UDim2.new(0, 12, 0, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text
-    lbl.TextColor3 = Theme.Text
-    lbl.Font = Enum.Font.GothamMedium
-    lbl.TextSize = 13
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = btn
+    lbl.Size = UDim2.new(1, -50, 1, 0); lbl.Position = UDim2.new(0, 10, 0, 0)
+    lbl.BackgroundTransparency = 1; lbl.Text = text; lbl.TextColor3 = Theme.Text
+    lbl.Font = Enum.Font.GothamMedium; lbl.TextSize = 12; lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Parent = btn
     
     local pill = Instance.new("Frame")
-    pill.Size = UDim2.new(0, 34, 0, 18)
-    pill.Position = UDim2.new(1, -46, 0.5, -9)
-    pill.BackgroundColor3 = default and Theme.Accent or Theme.AccentOff
-    pill.Parent = btn
+    pill.Size = UDim2.new(0, 30, 0, 16); pill.Position = UDim2.new(1, -40, 0.5, -8)
+    pill.BackgroundColor3 = default and Theme.Accent or Theme.AccentOff; pill.Parent = btn
     Instance.new("UICorner", pill).CornerRadius = UDim.new(1, 0)
     
     local circle = Instance.new("Frame")
-    circle.Size = UDim2.new(0, 14, 0, 14)
-    circle.Position = default and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)
-    circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    circle.Parent = pill
+    circle.Size = UDim2.new(0, 12, 0, 12)
+    circle.Position = default and UDim2.new(1, -14, 0.5, -6) or UDim2.new(0, 2, 0.5, -6)
+    circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255); circle.Parent = pill
     Instance.new("UICorner", circle).CornerRadius = UDim.new(1, 0)
     
     local state = default
@@ -318,40 +309,23 @@ local function CreateToggle(parent, text, default, callback)
     btn.MouseButton1Click:Connect(function()
         state = not state
         TweenService:Create(pill, TweenInfo.new(0.2), {BackgroundColor3 = state and Theme.Accent or Theme.AccentOff}):Play()
-        TweenService:Create(circle, TweenInfo.new(0.2), {Position = state and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)}):Play()
+        TweenService:Create(circle, TweenInfo.new(0.2), {Position = state and UDim2.new(1, -14, 0.5, -6) or UDim2.new(0, 2, 0.5, -6)}):Play()
         callback(state)
     end)
 end
 
 local function CreateTextBox(parent, text, default, callback)
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 0, 50)
-    frame.BackgroundColor3 = Theme.Element
-    frame.BorderSizePixel = 0
-    frame.Parent = parent
+    frame.Size = UDim2.new(1, 0, 0, 45); frame.BackgroundColor3 = Theme.Element; frame.BorderSizePixel = 0; frame.Parent = parent
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
     
     local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -20, 0, 20)
-    lbl.Position = UDim2.new(0, 12, 0, 6)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text
-    lbl.TextColor3 = Theme.TextDim
-    lbl.Font = Enum.Font.GothamMedium
-    lbl.TextSize = 12
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = frame
+    lbl.Size = UDim2.new(1, -20, 0, 20); lbl.Position = UDim2.new(0, 10, 0, 4); lbl.BackgroundTransparency = 1
+    lbl.Text = text; lbl.TextColor3 = Theme.TextDim; lbl.Font = Enum.Font.GothamMedium; lbl.TextSize = 11; lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Parent = frame
     
     local box = Instance.new("TextBox")
-    box.Size = UDim2.new(1, -20, 0, 18)
-    box.Position = UDim2.new(0, 12, 0, 26)
-    box.BackgroundTransparency = 1
-    box.Text = tostring(default)
-    box.TextColor3 = Theme.Text
-    box.Font = Enum.Font.GothamBold
-    box.TextSize = 13
-    box.TextXAlignment = Enum.TextXAlignment.Left
-    box.Parent = frame
+    box.Size = UDim2.new(1, -20, 0, 18); box.Position = UDim2.new(0, 10, 0, 23); box.BackgroundTransparency = 1
+    box.Text = tostring(default); box.TextColor3 = Theme.Text; box.Font = Enum.Font.GothamBold; box.TextSize = 12; box.TextXAlignment = Enum.TextXAlignment.Left; box.Parent = frame
     
     box.FocusLost:Connect(function()
         local num = tonumber(box.Text)
@@ -361,29 +335,15 @@ end
 
 local function CreateColorPicker(parent, text, callback)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, 36)
-    btn.BackgroundColor3 = Theme.Element
-    btn.BorderSizePixel = 0
-    btn.Text = ""
-    btn.Parent = parent
+    btn.Size = UDim2.new(1, 0, 0, 32); btn.BackgroundColor3 = Theme.Element; btn.BorderSizePixel = 0; btn.Text = ""; btn.Parent = parent
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
     
     local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -50, 1, 0)
-    lbl.Position = UDim2.new(0, 12, 0, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text
-    lbl.TextColor3 = Theme.Text
-    lbl.Font = Enum.Font.GothamMedium
-    lbl.TextSize = 13
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = btn
+    lbl.Size = UDim2.new(1, -50, 1, 0); lbl.Position = UDim2.new(0, 10, 0, 0); lbl.BackgroundTransparency = 1
+    lbl.Text = text; lbl.TextColor3 = Theme.Text; lbl.Font = Enum.Font.GothamMedium; lbl.TextSize = 12; lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Parent = btn
     
     local colorBox = Instance.new("Frame")
-    colorBox.Size = UDim2.new(0, 20, 0, 20)
-    colorBox.Position = UDim2.new(1, -32, 0.5, -10)
-    colorBox.BackgroundColor3 = Config.Color
-    colorBox.Parent = btn
+    colorBox.Size = UDim2.new(0, 18, 0, 18); colorBox.Position = UDim2.new(1, -28, 0.5, -9); colorBox.BackgroundColor3 = Config.Color; colorBox.Parent = btn
     Instance.new("UICorner", colorBox).CornerRadius = UDim.new(0, 4)
     
     btn.MouseEnter:Connect(function() TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Theme.ElementHover}):Play() end)
@@ -405,47 +365,58 @@ Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 12)
 local toggleStroke = Instance.new("UIStroke", ToggleBtn); toggleStroke.Color = Theme.Accent; toggleStroke.Thickness = 2
 MakeDraggable(ToggleBtn)
 
+-- MAIN WINDOW (Persegi Panjang / Widescreen)
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 280, 0, 420); Main.Position = UDim2.new(0.5, -140, 0.5, -210)
+Main.Size = UDim2.new(0, 450, 0, 250) -- Lebar 450, Tinggi 250
+Main.Position = UDim2.new(0.5, -225, 0.5, -125)
 Main.BackgroundColor3 = Theme.Background; Main.BorderSizePixel = 0; Main.Parent = ScreenGui
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10); MakeDraggable(Main)
-local stroke = Instance.new("UIStroke", Main); stroke.Color = Theme.Accent; stroke.Thickness = 1.5; stroke.Transparency = 0.5
+local stroke = Instance.new("UIStroke", Main); stroke.Color = Theme.Accent; stroke.Thickness = 1.5; stroke.Transparency = 0.3
 
+-- Top Bar
 local Title = Instance.new("Frame")
-Title.Size = UDim2.new(1, 0, 0, 40); Title.BackgroundColor3 = Theme.TopBar; Title.BorderSizePixel = 0; Title.Parent = Main
+Title.Size = UDim2.new(1, 0, 0, 35); Title.BackgroundColor3 = Theme.SideBar; Title.BorderSizePixel = 0; Title.Parent = Main
 Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 10)
-local fix = Instance.new("Frame"); fix.Size = UDim2.new(1, 0, 0, 10); fix.Position = UDim2.new(0, 0, 1, -10); fix.BackgroundColor3 = Theme.TopBar; fix.BorderSizePixel = 0; fix.Parent = Title
+local fix = Instance.new("Frame"); fix.Size = UDim2.new(1, 0, 0, 10); fix.Position = UDim2.new(0, 0, 1, -10); fix.BackgroundColor3 = Theme.SideBar; fix.BorderSizePixel = 0; fix.Parent = Title
 
 local TitleText = Instance.new("TextLabel")
 TitleText.Size = UDim2.new(1, -40, 1, 0); TitleText.Position = UDim2.new(0, 15, 0, 0); TitleText.BackgroundTransparency = 1
 TitleText.Text = "Brisk Survival Script"; TitleText.TextColor3 = Theme.Text; TitleText.Font = Enum.Font.GothamBold
-TitleText.TextSize = 15; TitleText.TextXAlignment = Enum.TextXAlignment.Left; TitleText.Parent = Title
+TitleText.TextSize = 14; TitleText.TextXAlignment = Enum.TextXAlignment.Left; TitleText.Parent = Title
 
 local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 30, 0, 30); CloseBtn.Position = UDim2.new(1, -38, 0.5, -15); CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-CloseBtn.Text = "X"; CloseBtn.TextColor3 = Theme.Text; CloseBtn.Font = Enum.Font.GothamBold; CloseBtn.TextSize = 12
+CloseBtn.Size = UDim2.new(0, 25, 0, 25); CloseBtn.Position = UDim2.new(1, -32, 0.5, -12.5); CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+CloseBtn.Text = "X"; CloseBtn.TextColor3 = Theme.Text; CloseBtn.Font = Enum.Font.GothamBold; CloseBtn.TextSize = 11
 CloseBtn.Parent = Title; Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
 CloseBtn.MouseButton1Click:Connect(function() Main.Visible = false; ToggleBtn.Visible = true end)
 ToggleBtn.MouseButton1Click:Connect(function() Main.Visible = true; ToggleBtn.Visible = false end)
 
-local TabBar = Instance.new("Frame")
-TabBar.Size = UDim2.new(1, -20, 0, 30); TabBar.Position = UDim2.new(0, 10, 0, 48)
-TabBar.BackgroundTransparency = 1; TabBar.Parent = Main
-local TabLayout = Instance.new("UIListLayout"); TabLayout.FillDirection = Enum.FillDirection.Horizontal; TabLayout.Padding = UDim.new(0, 5); TabLayout.Parent = TabBar
+-- Sidebar (Kiri)
+local SideBar = Instance.new("Frame")
+SideBar.Size = UDim2.new(0, 110, 1, -35); SideBar.Position = UDim2.new(0, 0, 0, 35)
+SideBar.BackgroundColor3 = Theme.SideBar; SideBar.BorderSizePixel = 0; SideBar.Parent = Main
+local sideFix = Instance.new("Frame"); sideFix.Size = UDim2.new(0, 10, 1, 0); sideFix.Position = UDim2.new(1, -10, 0, 0); sideFix.BackgroundColor3 = Theme.SideBar; sideFix.BorderSizePixel = 0; sideFix.Parent = SideBar
+local SideLayout = Instance.new("UIListLayout"); SideLayout.Padding = UDim.new(0, 5); SideLayout.SortOrder = Enum.SortOrder.LayoutOrder; SideLayout.Parent = SideBar
+local SidePadding = Instance.new("UIPadding"); SidePadding.PaddingTop = UDim.new(0, 10); SidePadding.PaddingLeft = UDim.new(0, 10); SidePadding.PaddingRight = UDim.new(0, 10); SidePadding.Parent = SideBar
+
+-- Konten Kanan
+local ContentArea = Instance.new("Frame")
+ContentArea.Size = UDim2.new(1, -110, 1, -35); ContentArea.Position = UDim2.new(0, 110, 0, 35)
+ContentArea.BackgroundTransparency = 1; ContentArea.Parent = Main
 
 local Pages = {}
 local function CreateTab(name, index)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 80, 1, 0); btn.BackgroundColor3 = Theme.Element; btn.Text = name
+    btn.Size = UDim2.new(1, 0, 0, 30); btn.BackgroundColor3 = Theme.Element; btn.Text = name
     btn.TextColor3 = Theme.TextDim; btn.Font = Enum.Font.GothamMedium; btn.TextSize = 12
-    btn.Parent = TabBar; Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    btn.Parent = SideBar; Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
     
     local page = Instance.new("ScrollingFrame")
-    page.Size = UDim2.new(1, -20, 1, -90); page.Position = UDim2.new(0, 10, 0, 85)
+    page.Size = UDim2.new(1, -20, 1, -10); page.Position = UDim2.new(0, 10, 0, 5)
     page.BackgroundTransparency = 1; page.BorderSizePixel = 0
     page.ScrollBarThickness = 3; page.ScrollBarImageColor3 = Theme.Accent
-    page.CanvasSize = UDim2.new(0, 0, 0, 0); page.Visible = false; page.Parent = Main
-    local pageLayout = Instance.new("UIListLayout"); pageLayout.Padding = UDim.new(0, 8); pageLayout.Parent = page
+    page.CanvasSize = UDim2.new(0, 0, 0, 0); page.Visible = false; page.Parent = ContentArea
+    local pageLayout = Instance.new("UIListLayout"); pageLayout.Padding = UDim.new(0, 6); pageLayout.Parent = page
     
     Pages[name] = {Btn = btn, Page = page, Layout = pageLayout}
     
@@ -490,6 +461,6 @@ CreateToggle(Pages["Misc"].Page, "No Weather", Config.NoWeather, function(v) Con
 
 for _, t in pairs(Pages) do
     t.Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        t.Page.CanvasSize = UDim2.new(0, 0, 0, t.Layout.AbsoluteContentSize.Y + 20)
+        t.Page.CanvasSize = UDim2.new(0, 0, 0, t.Layout.AbsoluteContentSize.Y + 10)
     end)
 end
