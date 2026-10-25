@@ -1,4 +1,4 @@
---[[ Brisk Survival Script — Anti-Crash Silent Aim (Part 1/3) ]]
+--[[ Brisk Survival Script — Trigger Bot Edition (Part 1/3) ]]
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -22,6 +22,8 @@ local Config = {
     ItemESP = true, Fullbright = true, NoFog = true, NoWeather = true,
     SilentAim = false, ShowFOV = true, FOV = 150,
     Aimbot = false,
+    -- Fitur Baru: Trigger Bot
+    TriggerBot = false, TriggerFOV = 25, TriggerDelay = 0.1
 }
 
 local oldGui = game.CoreGui:FindFirstChild("BriskSurvivalScript")
@@ -31,11 +33,15 @@ ScreenGui.Name = "BriskSurvivalScript"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = game.CoreGui
 
-local fovCircle
+local fovCircle, triggerCircle
 if Drawing then
     fovCircle = Drawing.new("Circle")
     fovCircle.Thickness = 1.5; fovCircle.Color = Theme.Accent
     fovCircle.Filled = false; fovCircle.Transparency = 0.75; fovCircle.Visible = false
+    
+    triggerCircle = Drawing.new("Circle")
+    triggerCircle.Thickness = 1.5; triggerCircle.Color = Theme.AccentGreen
+    triggerCircle.Filled = false; triggerCircle.Transparency = 0.75; triggerCircle.Visible = false
 end
 
 local function MakeDraggable(frame)
@@ -57,7 +63,7 @@ local function MakeDraggable(frame)
     end)
 end
 
--- TARGET FINDER (Ringan & Tanpa Loop Berat)
+-- TARGET FINDER
 local function getClosestTarget(fovRadius)
     local closest, shortestDist = nil, math.huge
     local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
@@ -77,12 +83,12 @@ local function getClosestTarget(fovRadius)
         end
     end
     return closest
-end
---[[ Part 2/3: Safe Silent Aim & Environment ]]
+end--[[ Part 2/3: Logic & Render Loop ]]
 local cachedTarget = nil
 local cachedPart = nil
+local lastTriggerTime = 0
 
--- Update target setiap frame (diluar hook biar ga crash)
+-- Background Target Cache
 RunService.Heartbeat:Connect(function()
     if Config.SilentAim then
         cachedTarget = getClosestTarget(Config.FOV)
@@ -94,30 +100,19 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- SILENT AIM HOOK (Hanya nge-hook Remote)
+-- Silent Aim Hook (Remote)
 local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
     if not checkcaller() and Config.SilentAim and cachedPart then
         if method == "FireServer" or method == "InvokeServer" then
             local args = {...}
-            local modified = false
-            -- Ubah semua argumen yang berhubungan dengan posisi/part
             for i, v in ipairs(args) do
-                if typeof(v) == "Vector3" then
-                    args[i] = cachedPart.Position
-                    modified = true
-                elseif typeof(v) == "CFrame" then
-                    args[i] = CFrame.lookAt(v.Position, cachedPart.Position)
-                    modified = true
-                elseif typeof(v) == "Instance" and v:IsA("BasePart") then
-                    args[i] = cachedPart
-                    modified = true
-                end
+                if typeof(v) == "Vector3" then args[i] = cachedPart.Position
+                elseif typeof(v) == "CFrame" then args[i] = CFrame.lookAt(v.Position, cachedPart.Position)
+                elseif typeof(v) == "Instance" and v:IsA("BasePart") then args[i] = cachedPart end
             end
-            if modified then
-                return oldNamecall(self, table.unpack(args))
-            end
+            return oldNamecall(self, table.unpack(args))
         end
     end
     return oldNamecall(self, ...)
@@ -136,7 +131,7 @@ local function applyEnvironment()
 end
 task.spawn(function() while task.wait(2) do pcall(applyEnvironment) end end)
 
--- ESP SYSTEM
+-- ESP & TRIGGER BOT LOOP
 local espObjects = {}
 local itemEspObjects = {}
 
@@ -176,15 +171,14 @@ end
 for _, p in ipairs(Players:GetPlayers()) do createESP(p) end
 Players.PlayerAdded:Connect(createESP)
 
--- ITEM ESP (Background Task)
+-- Item ESP Task
 task.spawn(function()
     while task.wait(2) do
         if Config.ItemESP then
             local LootNames = {"Loot", "Drop", "Item", "Crate", "Bag", "Weapon", "Gun", "Ammo", "Med", "Scrap", "Box"}
             for _, obj in ipairs(workspace:GetChildren()) do
                 if (obj:IsA("BasePart") or obj:IsA("Model")) and not itemEspObjects[obj] then
-                    local isLoot = false
-                    local name = obj.Name:lower()
+                    local isLoot = false; local name = obj.Name:lower()
                     for _, keyword in ipairs(LootNames) do if name:find(keyword:lower()) then isLoot = true break end end
                     if isLoot then
                         local isCharacter = false
@@ -207,7 +201,9 @@ task.spawn(function()
     end
 end)
 
+-- MAIN RENDER LOOP
 RunService.RenderStepped:Connect(function()
+    -- FOV Circles
     if fovCircle then
         local showFov = (Config.SilentAim or Config.Aimbot) and Config.ShowFOV
         fovCircle.Visible = showFov
@@ -216,7 +212,15 @@ RunService.RenderStepped:Connect(function()
             fovCircle.Radius = Config.FOV
         end
     end
+    if triggerCircle then
+        triggerCircle.Visible = Config.TriggerBot
+        if Config.TriggerBot then
+            triggerCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+            triggerCircle.Radius = Config.TriggerFOV
+        end
+    end
 
+    -- Aimbot Lock
     if Config.Aimbot and not Config.SilentAim then
         local target = getClosestTarget(Config.FOV)
         if target and target.Character then
@@ -227,6 +231,29 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
+    -- TRIGGER BOT LOGIC
+    if Config.TriggerBot then
+        local triggerTarget = getClosestTarget(Config.TriggerFOV)
+        if triggerTarget and triggerTarget.Character then
+            if tick() - lastTriggerTime > Config.TriggerDelay then
+                local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+                if tool then
+                    -- Fire the weapon
+                    pcall(function() tool:Activate() end)
+                    -- VirtualUser fallback for mobile
+                    pcall(function()
+                        local vim = game:GetService("VirtualInputManager")
+                        vim:SendMouseButtonEvent(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2, 0, true, game, 1)
+                        task.wait(0.05)
+                        vim:SendMouseButtonEvent(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2, 0, false, game, 1)
+                    end)
+                    lastTriggerTime = tick()
+                end
+            end
+        end
+    end
+
+    -- ESP Update
     for player, data in pairs(espObjects) do
         local char = player.Character
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -266,8 +293,7 @@ RunService.RenderStepped:Connect(function()
             if data.box then data.box.Visible = false end; if data.tracer then data.tracer.Visible = false end
         end
     end
-end)
---[[ Part 3/3: GUI ]]
+end)--[[ Part 3/3: GUI & Floating Buttons ]]
 local function CreateToggle(parent, text, default, callback)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1,0,0,34); btn.BackgroundColor3 = Theme.Element; btn.BorderSizePixel = 0; btn.Text = ""; btn.Parent = parent
@@ -418,10 +444,14 @@ end
 
 CreateTab("Combat", 1); CreateTab("Visuals", 2); CreateTab("Misc", 3)
 
+-- MENU COMBAT (Update Trigger Bot)
 CreateToggle(Pages["Combat"].Page, "Instant Aimbot (Lock)", Config.Aimbot, function(v) Config.Aimbot = v; if v then Config.SilentAim = false end; updateQuickAimVisual() end)
 CreateToggle(Pages["Combat"].Page, "Silent Aim (Remote)", Config.SilentAim, function(v) Config.SilentAim = v; if v then Config.Aimbot = false; updateQuickAimVisual() end end)
+CreateToggle(Pages["Combat"].Page, "Trigger Bot", Config.TriggerBot, function(v) Config.TriggerBot = v end)
+CreateSlider(Pages["Combat"].Page, "Trigger Bot FOV", 10, 100, Config.TriggerFOV, function(v) Config.TriggerFOV = v end)
+CreateSlider(Pages["Combat"].Page, "Trigger Delay (ms)", 50, 500, Config.TriggerDelay * 1000, function(v) Config.TriggerDelay = v / 1000 end)
 CreateToggle(Pages["Combat"].Page, "Show FOV Circle", Config.ShowFOV, function(v) Config.ShowFOV = v end)
-CreateSlider(Pages["Combat"].Page, "FOV Size", 50, 500, Config.FOV, function(v) Config.FOV = v end)
+CreateSlider(Pages["Combat"].Page, "Aimbot/Silent FOV", 50, 500, Config.FOV, function(v) Config.FOV = v end)
 
 CreateToggle(Pages["Visuals"].Page, "Master Player ESP", Config.ESP, function(v) Config.ESP = v end)
 CreateToggle(Pages["Visuals"].Page, "Box ESP", Config.Box, function(v) Config.Box = v end)
@@ -438,4 +468,4 @@ for _, t in pairs(Pages) do
     t.Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
         t.Page.CanvasSize = UDim2.new(0, 0, 0, t.Layout.AbsoluteContentSize.Y + 10)
     end)
-end
+    end
