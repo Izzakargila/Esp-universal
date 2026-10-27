@@ -1,4 +1,4 @@
---[[ Brisk Survival Script — Trigger Bot Edition (Part 1/3) ]]
+--[[ Brisk Survival Script — Wall Check & Mobile Trigger Bot (Part 1/3) ]]
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -22,8 +22,8 @@ local Config = {
     ItemESP = true, Fullbright = true, NoFog = true, NoWeather = true,
     SilentAim = false, ShowFOV = true, FOV = 150,
     Aimbot = false,
-    -- Fitur Baru: Trigger Bot
-    TriggerBot = false, TriggerFOV = 25, TriggerDelay = 0.1
+    TriggerBot = false, TriggerFOV = 25, TriggerDelay = 0.1,
+    WallCheck = true
 }
 
 local oldGui = game.CoreGui:FindFirstChild("BriskSurvivalScript")
@@ -63,7 +63,18 @@ local function MakeDraggable(frame)
     end)
 end
 
--- TARGET FINDER
+local function hasLineOfSight(targetPart)
+    if not Config.WallCheck then return true end
+    if not targetPart then return false end
+    local origin = Camera.CFrame.Position
+    local direction = (targetPart.Position - origin)
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, targetPart.Parent}
+    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+    local result = workspace:Raycast(origin, direction, raycastParams)
+    return result == nil
+end
+
 local function getClosestTarget(fovRadius)
     local closest, shortestDist = nil, math.huge
     local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
@@ -72,23 +83,25 @@ local function getClosestTarget(fovRadius)
             local part = player.Character:FindFirstChild("Head") or player.Character:FindFirstChild("HumanoidRootPart")
             local hum = player.Character:FindFirstChildOfClass("Humanoid")
             if part and hum and hum.Health > 0 then
-                local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
-                if onScreen then
-                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
-                    if dist <= fovRadius and dist < shortestDist then
-                        shortestDist = dist; closest = player
+                if hasLineOfSight(part) then
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                    if onScreen then
+                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
+                        if dist <= fovRadius and dist < shortestDist then
+                            shortestDist = dist; closest = player
+                        end
                     end
                 end
             end
         end
     end
     return closest
-end--[[ Part 2/3: Logic & Render Loop ]]
+end
+--[[ Part 2/3: Logic & Render Loop (Mobile Fixed) ]]
 local cachedTarget = nil
 local cachedPart = nil
 local lastTriggerTime = 0
 
--- Background Target Cache
 RunService.Heartbeat:Connect(function()
     if Config.SilentAim then
         cachedTarget = getClosestTarget(Config.FOV)
@@ -100,7 +113,6 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Silent Aim Hook (Remote)
 local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
@@ -131,7 +143,6 @@ local function applyEnvironment()
 end
 task.spawn(function() while task.wait(2) do pcall(applyEnvironment) end end)
 
--- ESP & TRIGGER BOT LOOP
 local espObjects = {}
 local itemEspObjects = {}
 
@@ -171,7 +182,6 @@ end
 for _, p in ipairs(Players:GetPlayers()) do createESP(p) end
 Players.PlayerAdded:Connect(createESP)
 
--- Item ESP Task
 task.spawn(function()
     while task.wait(2) do
         if Config.ItemESP then
@@ -201,9 +211,7 @@ task.spawn(function()
     end
 end)
 
--- MAIN RENDER LOOP
 RunService.RenderStepped:Connect(function()
-    -- FOV Circles
     if fovCircle then
         local showFov = (Config.SilentAim or Config.Aimbot) and Config.ShowFOV
         fovCircle.Visible = showFov
@@ -220,7 +228,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Aimbot Lock
     if Config.Aimbot and not Config.SilentAim then
         local target = getClosestTarget(Config.FOV)
         if target and target.Character then
@@ -231,29 +238,23 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- TRIGGER BOT LOGIC
+    -- TRIGGER BOT (MOBILE FIX: Tanpa VirtualInputManager)
     if Config.TriggerBot then
         local triggerTarget = getClosestTarget(Config.TriggerFOV)
         if triggerTarget and triggerTarget.Character then
             if tick() - lastTriggerTime > Config.TriggerDelay then
-                local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-                if tool then
-                    -- Fire the weapon
-                    pcall(function() tool:Activate() end)
-                    -- VirtualUser fallback for mobile
-                    pcall(function()
-                        local vim = game:GetService("VirtualInputManager")
-                        vim:SendMouseButtonEvent(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2, 0, true, game, 1)
-                        task.wait(0.05)
-                        vim:SendMouseButtonEvent(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2, 0, false, game, 1)
-                    end)
+                local character = LocalPlayer.Character
+                local tool = character and character:FindFirstChildOfClass("Tool")
+                
+                -- Pastikan senjata ada dan lagi dipegang (Parentnya adalah Character)
+                if tool and tool.Parent == character then
+                    pcall(function() tool:Activate() end) -- Nembak tanpa nyentuh layar
                     lastTriggerTime = tick()
                 end
             end
         end
     end
 
-    -- ESP Update
     for player, data in pairs(espObjects) do
         local char = player.Character
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -293,7 +294,8 @@ RunService.RenderStepped:Connect(function()
             if data.box then data.box.Visible = false end; if data.tracer then data.tracer.Visible = false end
         end
     end
-end)--[[ Part 3/3: GUI & Floating Buttons ]]
+end)
+--[[ Part 3/3: GUI & Floating Buttons ]]
 local function CreateToggle(parent, text, default, callback)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1,0,0,34); btn.BackgroundColor3 = Theme.Element; btn.BorderSizePixel = 0; btn.Text = ""; btn.Parent = parent
@@ -444,7 +446,7 @@ end
 
 CreateTab("Combat", 1); CreateTab("Visuals", 2); CreateTab("Misc", 3)
 
--- MENU COMBAT (Update Trigger Bot)
+CreateToggle(Pages["Combat"].Page, "Wall Check (Aim/Trigger)", Config.WallCheck, function(v) Config.WallCheck = v end)
 CreateToggle(Pages["Combat"].Page, "Instant Aimbot (Lock)", Config.Aimbot, function(v) Config.Aimbot = v; if v then Config.SilentAim = false end; updateQuickAimVisual() end)
 CreateToggle(Pages["Combat"].Page, "Silent Aim (Remote)", Config.SilentAim, function(v) Config.SilentAim = v; if v then Config.Aimbot = false; updateQuickAimVisual() end end)
 CreateToggle(Pages["Combat"].Page, "Trigger Bot", Config.TriggerBot, function(v) Config.TriggerBot = v end)
@@ -468,4 +470,4 @@ for _, t in pairs(Pages) do
     t.Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
         t.Page.CanvasSize = UDim2.new(0, 0, 0, t.Layout.AbsoluteContentSize.Y + 10)
     end)
-    end
+end
