@@ -1,13 +1,21 @@
---[[ Brisk Survival Script — Config Manager Edition (Part 1/3) ]]
+--[[ 
+    Brisk Survival Script | Full Edition (Part 1/3)
+    Features: ESP, Aimbot, Silent Aim, Trigger Bot, Fullbright, Config System
+]]
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local Drawing = Drawing or nil
 
+-- ======================
+-- THEME & CONFIG
+-- ======================
 local Theme = {
     Background = Color3.fromRGB(12, 12, 16), SideBar = Color3.fromRGB(18, 18, 24),
     Element = Color3.fromRGB(28, 28, 36), ElementHover = Color3.fromRGB(42, 42, 54),
@@ -27,42 +35,33 @@ local Config = {
     WallCheck = true
 }
 
--- [ CONFIG MANAGER UTILS ]
-local HttpService = game:GetService("HttpService")
+-- ======================
+-- CONFIG MANAGER
+-- ======================
 local ConfigFolder = "BriskScript/Configs/"
 if not isfolder(ConfigFolder) then makefolder(ConfigFolder) end
 
 local function saveConfig(name)
-    if not writefile then return end
+    if not writefile then return false end
     local data = {}
     for k, v in pairs(Config) do
-        if typeof(v) == "Color3" then
-            data[k] = {r = v.R, g = v.G, b = v.B, isColor = true}
-        else
-            data[k] = v
-        end
+        if typeof(v) == "Color3" then data[k] = {r=v.R, g=v.G, b=v.B, isColor=true}
+        else data[k] = v end
     end
-    local success, err = pcall(function()
-        writefile(ConfigFolder .. name .. ".txt", HttpService:JSONEncode(data))
-    end)
-    if success then return true else return false end
+    local success = pcall(function() writefile(ConfigFolder .. name .. ".txt", HttpService:JSONEncode(data)) end)
+    return success
 end
 
 local function loadConfig(name)
-    if not isfile then return end
+    if not isfile then return false end
     local path = ConfigFolder .. name .. ".txt"
     if isfile(path) then
-        local success, decoded = pcall(function()
-            return HttpService:JSONDecode(readfile(path))
-        end)
+        local success, decoded = pcall(function() return HttpService:JSONDecode(readfile(path)) end)
         if success and decoded then
             for k, v in pairs(decoded) do
                 if Config[k] ~= nil then
-                    if type(v) == "table" and v.isColor then
-                        Config[k] = Color3.new(v.r, v.g, v.b)
-                    else
-                        Config[k] = v
-                    end
+                    if type(v) == "table" and v.isColor then Config[k] = Color3.new(v.r, v.g, v.b)
+                    else Config[k] = v end
                 end
             end
             return true
@@ -71,24 +70,13 @@ local function loadConfig(name)
     return false
 end
 
-local function getConfigs()
-    local list = {}
-    if listfiles then
-        for _, f in ipairs(listfiles(ConfigFolder)) do
-            local name = f:match("([^/\\]+)%.txt$")
-            if name then table.insert(list, name) end
-        end
-    end
-    return list
-end
-
--- Auto Load "default"
 pcall(function()
-    if isfile(ConfigFolder .. "default.txt") then
-        loadConfig("default")
-    end
+    if isfile(ConfigFolder .. "default.txt") then loadConfig("default") end
 end)
 
+-- ======================
+-- GUI INIT
+-- ======================
 local oldGui = game.CoreGui:FindFirstChild("BriskSurvivalScript")
 if oldGui then oldGui:Destroy() end
 local ScreenGui = Instance.new("ScreenGui")
@@ -160,7 +148,7 @@ local function getClosestTarget(fovRadius)
     end
     return closest
 end
---[[ Part 2/3: Logic & Render Loop (Continuous Detection) ]]
+--[[ Part 2/3: Logic & Render Loop ]]
 local cachedTarget = nil
 local cachedPart = nil
 local lastTriggerTime = 0
@@ -168,11 +156,8 @@ local lastTriggerTime = 0
 RunService.Heartbeat:Connect(function()
     if Config.SilentAim then
         cachedTarget = getClosestTarget(Config.FOV)
-        if cachedTarget then
-            cachedPart = cachedTarget:FindFirstChild("Head") or cachedTarget:FindFirstChild("HumanoidRootPart")
-        else
-            cachedPart = nil
-        end
+        if cachedTarget then cachedPart = cachedTarget:FindFirstChild("Head") or cachedTarget:FindFirstChild("HumanoidRootPart")
+        else cachedPart = nil end
     end
 end)
 
@@ -193,20 +178,6 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     return oldNamecall(self, ...)
 end)
 
-local function applyEnvironment()
-    if Config.Fullbright then
-        Lighting.Ambient = Color3.fromRGB(255,255,255); Lighting.OutdoorAmbient = Color3.fromRGB(255,255,255)
-        Lighting.Brightness = 2; Lighting.GlobalShadows = false
-    end
-    if Config.NoFog then Lighting.FogEnd = 1e6; Lighting.FogStart = 0 end
-    if Config.NoWeather then
-        local atm = Lighting:FindFirstChildOfClass("Atmosphere"); local cld = Lighting:FindFirstChildOfClass("Clouds")
-        if atm then atm:Destroy() end; if cld then cld:Destroy() end
-    end
-end
-task.spawn(function() while task.wait(2) do pcall(applyEnvironment) end end)
-
--- ESP SYSTEM
 local espObjects = {}
 local itemEspObjects = {}
 
@@ -214,7 +185,6 @@ local function createESP(model)
     if not model or not model:IsA("Model") or model == LocalPlayer.Character then return end
     local hum = model:FindFirstChildOfClass("Humanoid")
     if not hum then return end
-    
     local hrp = model:FindFirstChild("HumanoidRootPart")
     local head = model:FindFirstChild("Head")
     if not hrp or not head then return end
@@ -246,23 +216,18 @@ local function createESP(model)
     espObjects[model] = data
 end
 
--- BACKGROUND SCANNER (Loop Deteksi Musuh/Player Baru)
 task.spawn(function()
     while task.wait(1) do
         for _, obj in ipairs(workspace:GetDescendants()) do
             if obj:IsA("Model") and obj ~= LocalPlayer.Character then
                 local hum = obj:FindFirstChildOfClass("Humanoid")
                 local hrp = obj:FindFirstChild("HumanoidRootPart")
-                -- Kalau ada model yang punya Humanoid, HRP, dan belum didaftarkan
-                if hum and hrp and hum.Health > 0 and not espObjects[obj] then
-                    createESP(obj)
-                end
+                if hum and hrp and hum.Health > 0 and not espObjects[obj] then createESP(obj) end
             end
         end
     end
 end)
 
--- Item ESP Task
 task.spawn(function()
     while task.wait(2) do
         if Config.ItemESP then
@@ -289,6 +254,17 @@ task.spawn(function()
 end)
 
 RunService.RenderStepped:Connect(function()
+    if Config.Fullbright then
+        Lighting.Ambient = Color3.fromRGB(255,255,255); Lighting.OutdoorAmbient = Color3.fromRGB(255,255,255)
+        Lighting.Brightness = 2; Lighting.GlobalShadows = false
+        Lighting.EnvironmentDiffuseScale = 1; Lighting.EnvironmentSpecularScale = 1
+    end
+    if Config.NoFog then Lighting.FogEnd = 1e6; Lighting.FogStart = 0 end
+    if Config.NoWeather then
+        local atm = Lighting:FindFirstChildOfClass("Atmosphere"); local cld = Lighting:FindFirstChildOfClass("Clouds")
+        if atm then atm:Destroy() end; if cld then cld:Destroy() end
+    end
+
     if fovCircle then
         local showFov = (Config.SilentAim or Config.Aimbot) and Config.ShowFOV
         fovCircle.Visible = showFov
@@ -329,7 +305,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Render ESP
     for model, data in pairs(espObjects) do
         local hum = model:FindFirstChildOfClass("Humanoid")
         local hrp = model:FindFirstChild("HumanoidRootPart")
@@ -337,7 +312,6 @@ RunService.RenderStepped:Connect(function()
         
         if hum and hum.Health > 0 and hrp and head and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
             local distance = (LocalPlayer.Character.HumanoidRootPart.Position - hrp.Position).Magnitude
-            
             if distance <= Config.MaxDist then
                 if data.highlight then data.highlight.Enabled = Config.Chams and Config.ESP end
                 if data.billboard then
@@ -350,7 +324,6 @@ RunService.RenderStepped:Connect(function()
                         data.textLabel.Text = txt
                     end
                 end
-                
                 if data.box and data.tracer and Drawing and Config.ESP then
                     local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
                     if onScreen then
@@ -361,34 +334,24 @@ RunService.RenderStepped:Connect(function()
                         data.tracer.Visible = Config.Tracer; data.tracer.Color = Config.Color
                         data.tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
                         data.tracer.To = Vector2.new(screenPos.X, screenPos.Y)
-                    else
-                        data.box.Visible = false; data.tracer.Visible = false
-                    end
+                    else data.box.Visible = false; data.tracer.Visible = false end
                 end
             else
-                if data.highlight then data.highlight.Enabled = false end
-                if data.billboard then data.billboard.Enabled = false end
-                if data.box then data.box.Visible = false end
-                if data.tracer then data.tracer.Visible = false end
+                if data.highlight then data.highlight.Enabled = false end; if data.billboard then data.billboard.Enabled = false end
+                if data.box then data.box.Visible = false end; if data.tracer then data.tracer.Visible = false end
             end
         else
-            if data.highlight then data.highlight.Enabled = false end
-            if data.billboard then data.billboard.Enabled = false end
-            if data.box then data.box.Visible = false end
-            if data.tracer then data.tracer.Visible = false end
-            
-            -- Auto Cleanup jika model hancur/mati
+            if data.highlight then data.highlight.Enabled = false end; if data.billboard then data.billboard.Enabled = false end
+            if data.box then data.box.Visible = false end; if data.tracer then data.tracer.Visible = false end
             if not model.Parent or not hum or hum.Health <= 0 then
-                if data.highlight then data.highlight:Destroy() end
-                if data.billboard then data.billboard:Destroy() end
-                if data.box then data.box:Remove() end
-                if data.tracer then data.tracer:Remove() end
+                if data.highlight then data.highlight:Destroy() end; if data.billboard then data.billboard:Destroy() end
+                if data.box then data.box:Remove() end; if data.tracer then data.tracer:Remove() end
                 espObjects[model] = nil
             end
         end
     end
 end)
---[[ Part 3/3: GUI & Floating Buttons + Config Manager ]]
+--[[ Part 3/3: GUI Builder & Floating Buttons ]]
 local function CreateToggle(parent, text, default, callback)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1,0,0,34); btn.BackgroundColor3 = Theme.Element; btn.BorderSizePixel = 0; btn.Text = ""; btn.Parent = parent
@@ -444,7 +407,6 @@ local function CreateSlider(parent, text, min, max, default, callback)
     UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end end)
 end
 
--- Button Builder untuk Config
 local function CreateButton(parent, text, callback)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1,0,0,34); btn.BackgroundColor3 = Theme.Element; btn.BorderSizePixel = 0; btn.Text = text
@@ -455,6 +417,7 @@ local function CreateButton(parent, text, callback)
     btn.MouseButton1Click:Connect(callback)
 end
 
+-- FLOATING BUTTONS
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(0, 50, 0, 50); ToggleBtn.Position = UDim2.new(0.05, 0, 0.2, 0)
 ToggleBtn.BackgroundColor3 = Theme.Background; ToggleBtn.Text = "BSS"; ToggleBtn.TextColor3 = Theme.Accent
@@ -486,6 +449,7 @@ QuickAimBtn.MouseButton1Click:Connect(function()
     updateQuickAimVisual()
 end)
 
+-- MAIN WINDOW
 local Main = Instance.new("Frame")
 Main.Size = UDim2.new(0, 450, 0, 260); Main.Position = UDim2.new(0.5, -225, 0.5, -130)
 Main.BackgroundColor3 = Theme.Background; Main.BorderSizePixel = 0; Main.Parent = ScreenGui
@@ -588,8 +552,7 @@ end
 
 CreateButton(Pages["Configs"].Page, "💾 Save Config", function()
     local name = GetConfigName()
-    local ok = saveConfig(name)
-    if ok then
+    if saveConfig(name) then
         if _G.Notify then _G.Notify("Config", "Berhasil menyimpan: "..name, 3) end
     else
         if _G.Notify then _G.Notify("Config", "Gagal save (Executor tidak support)", 3) end
@@ -598,15 +561,8 @@ end)
 
 CreateButton(Pages["Configs"].Page, "📂 Load Config", function()
     local name = GetConfigName()
-    local ok = loadConfig(name)
-    if ok then
+    if loadConfig(name) then
         if _G.Notify then _G.Notify("Config", "Berhasil memuat: "..name, 3) end
-        -- Refresh GUI Text (Hacky way)
-        for text, func in pairs(_G.UpdateToggles) do
-            if Config[text:gsub(" %b()",""):gsub(" ","")] ~= nil then
-                -- Bisa di-refresh manual jika diperlukan
-            end
-        end
     else
         if _G.Notify then _G.Notify("Config", "Config tidak ditemukan", 3) end
     end
@@ -641,7 +597,7 @@ CreateButton(Pages["Configs"].Page, "📥 Import Config", function()
     end
 end)
 
--- Buat fungsi Notify sederhana (Toast)
+-- Notify System
 _G.Notify = function(title, text, duration)
     local notif = Instance.new("TextLabel")
     notif.Size = UDim2.new(0, 300, 0, 50)
