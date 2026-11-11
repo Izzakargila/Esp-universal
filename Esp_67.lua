@@ -1,4 +1,4 @@
---[[ Brisk Survival Script — Safe No Grass Fix (Part 1/3) ]]
+--[[ Brisk Survival Script — Ultimate No Grass Fix (Part 1/3) ]]
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -138,21 +138,31 @@ local function getClosestTarget(fovRadius)
     return closest
 end
 
--- FITUR NO GRASS (SAFE VERSION - TANPA HAPUS TERRAIN)
+-- FITUR NO GRASS (MATERIAL BYPASS & FOLIAGE)
 task.spawn(function()
     while task.wait(1) do
         if Config.NoGrass then
-            -- Hanya hapus Decal/Texture dan Part yang namanya rumput/daun
+            -- 1. Hapus semua ParticleEmitter yang biasanya bikin efek rumput berdesir
             for _, obj in ipairs(workspace:GetDescendants()) do
-                if obj:IsA("Decal") or obj:IsA("Texture") or obj:IsA("MeshPart") or obj:IsA("BasePart") then
+                if obj:IsA("ParticleEmitter") then
                     local name = obj.Name:lower()
-                    if name:find("grass") or name:find("fern") or name:find("bush") or name:find("weed") then
-                        if obj:IsA("BasePart") or obj:IsA("MeshPart") then
-                            obj.Transparency = 1
-                            obj.CanCollide = false
-                        elseif obj:IsA("Decal") or obj:IsA("Texture") then
-                            obj.Transparency = 1
-                        end
+                    if name:find("grass") or name:find("leaf") or name:find("bush") or name:find("fern") then
+                        obj.Enabled = false
+                    end
+                end
+                
+                -- 2. Cari BasePart/MeshPart dengan Material Grass dan bikin transparan
+                if obj:IsA("BasePart") or obj:IsA("MeshPart") then
+                    if obj.Material == Enum.Material.Grass then
+                        obj.Transparency = 1
+                    end
+                end
+                
+                -- 3. Hapus Decal/Texture daun
+                if obj:IsA("Decal") or obj:IsA("Texture") then
+                    local name = obj.Name:lower()
+                    if name:find("grass") or name:find("leaf") or name:find("bush") or name:find("fern") then
+                        obj.Transparency = 1
                     end
                 end
             end
