@@ -1,4 +1,4 @@
---[[ Brisk Survival Script — Real No Grass Fix (Part 1/3) ]]
+--[[ Brisk Survival Script — Safe No Grass Fix (Part 1/3) ]]
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -138,24 +138,21 @@ local function getClosestTarget(fovRadius)
     return closest
 end
 
--- FITUR NO GRASS (FIX TERRAIN & DECAL)
+-- FITUR NO GRASS (SAFE VERSION - TANPA HAPUS TERRAIN)
 task.spawn(function()
     while task.wait(1) do
         if Config.NoGrass then
-            -- 1. Hapus Grass dari Terrain
-            local terrain = workspace:FindFirstChildOfClass("Terrain")
-            if terrain then
-                pcall(function()
-                    terrain:Clear()
-                end)
-            end
-            
-            -- 2. Hapus Decal/Texture rumput
+            -- Hanya hapus Decal/Texture dan Part yang namanya rumput/daun
             for _, obj in ipairs(workspace:GetDescendants()) do
-                if obj:IsA("Decal") or obj:IsA("Texture") then
+                if obj:IsA("Decal") or obj:IsA("Texture") or obj:IsA("MeshPart") or obj:IsA("BasePart") then
                     local name = obj.Name:lower()
-                    if name:find("grass") or name:find("rumput") or name:find("bush") then
-                        obj.Transparency = 1
+                    if name:find("grass") or name:find("fern") or name:find("bush") or name:find("weed") then
+                        if obj:IsA("BasePart") or obj:IsA("MeshPart") then
+                            obj.Transparency = 1
+                            obj.CanCollide = false
+                        elseif obj:IsA("Decal") or obj:IsA("Texture") then
+                            obj.Transparency = 1
+                        end
                     end
                 end
             end
