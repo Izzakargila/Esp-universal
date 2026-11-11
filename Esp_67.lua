@@ -1,8 +1,4 @@
---[[ 
-    Brisk Survival Script | Full Edition (Part 1/3)
-    Features: ESP, Aimbot, Silent Aim, Trigger Bot, Fullbright, Config System
-]]
-
+--[[ Brisk Survival Script — No Grass Edition (Part 1/3) ]]
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -13,9 +9,6 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local Drawing = Drawing or nil
 
--- ======================
--- THEME & CONFIG
--- ======================
 local Theme = {
     Background = Color3.fromRGB(12, 12, 16), SideBar = Color3.fromRGB(18, 18, 24),
     Element = Color3.fromRGB(28, 28, 36), ElementHover = Color3.fromRGB(42, 42, 54),
@@ -28,16 +21,14 @@ local Config = {
     ESP = true, Box = true, Tracer = true, Chams = true, Name = true, Distance = true, 
     MaxDist = 5000, 
     Color = Color3.fromRGB(255, 50, 50),
-    ItemESP = true, Fullbright = true, NoFog = true, NoWeather = true,
+    ItemESP = true, Fullbright = true, NoFog = true, NoWeather = true, NoGrass = true,
     SilentAim = false, ShowFOV = true, FOV = 150,
     Aimbot = false,
     TriggerBot = false, TriggerFOV = 200, TriggerDelay = 0.1,
     WallCheck = true
 }
 
--- ======================
 -- CONFIG MANAGER
--- ======================
 local ConfigFolder = "BriskScript/Configs/"
 if not isfolder(ConfigFolder) then makefolder(ConfigFolder) end
 
@@ -74,9 +65,7 @@ pcall(function()
     if isfile(ConfigFolder .. "default.txt") then loadConfig("default") end
 end)
 
--- ======================
 -- GUI INIT
--- ======================
 local oldGui = game.CoreGui:FindFirstChild("BriskSurvivalScript")
 if oldGui then oldGui:Destroy() end
 local ScreenGui = Instance.new("ScreenGui")
@@ -148,7 +137,23 @@ local function getClosestTarget(fovRadius)
     end
     return closest
 end
---[[ Part 2/3: Logic & Render Loop ]]
+
+-- FITUR NO GRASS
+task.spawn(function()
+    while task.wait(1) do
+        if Config.NoGrass then
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("BasePart") or obj:IsA("MeshPart") then
+                    local name = obj.Name:lower()
+                    if name:find("grass") or (name:find("decal") and name:find("grass")) then
+                        obj.Transparency = 1
+                        obj.CanCollide = false
+                    end
+                end
+            end
+        end
+    end
+end)--[[ Part 2/3: Logic & Render Loop ]]
 local cachedTarget = nil
 local cachedPart = nil
 local lastTriggerTime = 0
@@ -350,8 +355,7 @@ RunService.RenderStepped:Connect(function()
             end
         end
     end
-end)
---[[ Part 3/3: GUI Builder & Floating Buttons ]]
+end)--[[ Part 3/3: GUI Builder & Floating Buttons ]]
 local function CreateToggle(parent, text, default, callback)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1,0,0,34); btn.BackgroundColor3 = Theme.Element; btn.BorderSizePixel = 0; btn.Text = ""; btn.Parent = parent
@@ -535,6 +539,7 @@ CreateSlider(Pages["Visuals"].Page, "Max ESP Distance", 500, 10000, Config.MaxDi
 CreateToggle(Pages["Misc"].Page, "Fullbright", Config.Fullbright, function(v) Config.Fullbright = v end)
 CreateToggle(Pages["Misc"].Page, "No Fog", Config.NoFog, function(v) Config.NoFog = v end)
 CreateToggle(Pages["Misc"].Page, "No Weather", Config.NoWeather, function(v) Config.NoWeather = v end)
+CreateToggle(Pages["Misc"].Page, "No Grass", Config.NoGrass, function(v) Config.NoGrass = v end) -- FITUR BARU
 
 -- CONFIGS TAB
 local ConfigNameBox = Instance.new("TextBox")
